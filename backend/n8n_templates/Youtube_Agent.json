@@ -1,0 +1,1265 @@
+{
+  "name": "Youtube_Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1008,
+        80
+      ],
+      "id": "6a1356e0-cecb-4153-b55e-5a591a8ee11f",
+      "name": "Telegram Trigger",
+      "webhookId": "615828bc-f694-42ec-943a-37e8d01ee4db",
+      "credentials": {
+        "telegramApi": {
+          "id": "l1U9WXgTJmontEBM",
+          "name": "jacobot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e7211e46-0f49-46a0-9cb7-e83fed150efd",
+                    "leftValue": "={{ $json.message.photo }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "array",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Foto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "85edf561-8f5e-4215-9e19-78ff0392068e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Texto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8184dc93-f51b-4706-acc7-172d66ded77c",
+                    "leftValue": "={{ $json.message.voice }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1136,
+        80
+      ],
+      "id": "8132300e-5c8d-4681-90a6-47b780dcfe41",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Telegram Trigger').item.json.message.photo[1].file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1472,
+        16
+      ],
+      "id": "e83088c1-b168-4449-93d5-0a753afde4f1",
+      "name": "Download File",
+      "webhookId": "3aac77a9-f818-433f-a1f0-c26f66a21088",
+      "credentials": {
+        "telegramApi": {
+          "id": "l1U9WXgTJmontEBM",
+          "name": "jacobot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "={{ $now.format('yyyy-MM-dd') }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "11XdqRpfnY6nHkdrM3W81nJaFhWx3Kan4",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1616,
+        16
+      ],
+      "id": "e52fe9dc-8cac-47f8-b5fe-4c9efedc7b16",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "nDbhcQKFf7NIXVC6",
+          "name": "danielcarreong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "53de4eb0-6684-48f5-a5b5-2b3bedaff817",
+              "name": "message.text",
+              "value": "=El usuario acaba de enviar una imagen. Aquí está el ID de ese archivo en Google Drive: {{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1760,
+        16
+      ],
+      "id": "3dc6313a-7e42-4fbe-8396-8ae54fc2d31f",
+      "name": "Set Text"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=## Overview\n  Eres un asistente especializado en YouTube y generación de contenido visual. Tu trabajo es usar las herramientas a las que tienes acceso para\n  ayudar al usuario con la creación y gestión de miniaturas, imágenes y contenido para YouTube.\n\n  ### Herramientas Disponibles\n\n  #### 🎨 Herramientas de Generación de Miniaturas\n  **Miniaturas_YT** - La herramienta principal para generar miniaturas de YouTube. Recibe: prompt (descripción del contenido), image1 (ID de \n  archivo), image2 (ID de archivo), imageTitle (nombre para los archivos). Crea automáticamente múltiples variaciones optimizadas para YouTube.\n\n  **Combinar imágenes** - Combina dos imágenes en una sola usando IA. Usa cuando el usuario quiera fusionar o mezclar imágenes específicas. \n  Parámetros: prompt, image1, image2, imageTitle.\n\n  #### 🔍 Herramientas de Búsqueda\n  **Search Raw Files** - Busca archivos de imagen que el usuario haya subido previamente a Google Drive. Usa cuando necesites encontrar fotos \n  originales del usuario.\n\n  **Search AI Images** - Busca imágenes generadas por IA que hayas ayudado al usuario a crear anteriormente. Útil para encontrar miniaturas o \n  imágenes editadas previas.\n\n  #### ⚙️ Herramientas de Gestión\n  **Change Name** - Cambia el nombre de un archivo en Google Drive. Necesitas el ID del archivo. Úsala cuando el usuario suba una nueva imagen.\n\n  **Editar Imagen** - Edita una imagen existiente usando IA. Para modificaciones, mejoras o cambios en imágenes ya existentes.\n\n  **visionTool** - Analiza y describe imágenes. Usa cuando el usuario haga preguntas sobre una imagen o necesites entender el contenido visual para \n  hacer recomendaciones.\n\n  ### Flujo de Trabajo Recomendado\n\n  #### Cuando el usuario sube una imagen:\n  1. Pregunta: \"¿Cómo te gustaría que nombrara esa foto en tu Google Drive?\"\n  2. Usa **Change Name** con su respuesta\n\n  #### Para generar miniaturas de YouTube:\n  1. Pregunta sobre el tema/título del video\n  2. Usa **Search Raw Files** para encontrar fotos del usuario\n  3. Si necesita dos imágenes, pregunta por la segunda o usa **Search AI Images**\n  4. Usa **Miniaturas_YT** con el prompt descriptivo y las dos imágenes\n  5. Presenta las opciones generadas\n\n  #### Para combinar imágenes específicas:\n  1. Usa **Search Raw Files** o **Search AI Images** para encontrar las imágenes\n  2. Pregunta qué tipo de combinación quiere\n  3. Usa **Combinar imágenes** con un prompt descriptivo\n\n  #### Para analizar imágenes:\n  1. Usa **visionTool** para entender el contenido\n  2. Basándote en el análisis, sugiere mejoras o usos para YouTube\n\n  ### Instrucciones Específicas\n  - **Siempre pregunta por nombres** cuando el usuario suba archivos\n  - **Se proactivo** sugiriendo estilos de miniatura basados en el tema del video\n  - **Usa búsquedas** antes de pedir IDs de archivos específicos\n  - **Combina herramientas** inteligentemente (ej: visionTool + Miniaturas_YT para mejores resultados)\n\n  ### Personalidad\n  Sé entusiasta sobre YouTube y creación de contenido. Ayuda al usuario a crear miniaturas llamativas que aumenten sus visualizaciones. Explica por \n  qué ciertos estilos funcionan mejor para diferentes tipos de contenido.",
+          "returnIntermediateSteps": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        2144,
+        96
+      ],
+      "id": "a1c54a1e-51f5-4775-acd5-b18ef1e5b976",
+      "name": "Photoshop Agent",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2416,
+        96
+      ],
+      "id": "c950ced9-9852-463b-a692-ddab5f64f6fd",
+      "name": "Respond",
+      "webhookId": "51edbcff-e6b8-46e7-8e75-e340a5c745e5",
+      "credentials": {
+        "telegramApi": {
+          "id": "l1U9WXgTJmontEBM",
+          "name": "jacobot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('File_to_Update', ``, 'string') }}"
+        },
+        "newUpdatedFileName": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('New_Updated_File_Name', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTool",
+      "typeVersion": 3,
+      "position": [
+        1808,
+        464
+      ],
+      "id": "af2a2b73-7018-40ec-be60-a2bc5a4ed029",
+      "name": "Change Name",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "nDbhcQKFf7NIXVC6",
+          "name": "danielcarreong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "11XdqRpfnY6nHkdrM3W81nJaFhWx3Kan4",
+            "mode": "id"
+          },
+          "whatToSearch": "files"
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "webViewLink"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDriveTool",
+      "typeVersion": 3,
+      "position": [
+        1952,
+        464
+      ],
+      "id": "bdfa9cfc-80aa-4f5b-a079-c3e58fde8bfc",
+      "name": "Search Raw Files",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "nDbhcQKFf7NIXVC6",
+          "name": "danielcarreong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "1FpEchTQwsmjdNuJQD1F_uioiN5mp9x0u",
+            "mode": "id"
+          },
+          "whatToSearch": "files"
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "webViewLink"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDriveTool",
+      "typeVersion": 3,
+      "position": [
+        2112,
+        464
+      ],
+      "id": "0850ae4f-6711-4550-806c-5e5a9f44161c",
+      "name": "Search AI Images",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "nDbhcQKFf7NIXVC6",
+          "name": "danielcarreong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Cerebro",
+        "height": 224,
+        "width": 416,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        960,
+        384
+      ],
+      "id": "0f350e53-e19f-47f5-9147-00e3d2817dbf",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "##### Herramientas de Generacion",
+        "height": 224,
+        "width": 288,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        384
+      ],
+      "id": "131ee210-ad36-4576-bcb5-5146bb307a25",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Manejo de Archivos\n\n",
+        "height": 224,
+        "width": 480,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        384
+      ],
+      "id": "722474de-2f91-479b-a27f-6d19b1749dc2",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Entrada de Texto / Imágenes via Telegram\n",
+        "height": 576,
+        "width": 976,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        960,
+        -224
+      ],
+      "id": "5d42b762-68ae-4c77-82ce-cd1d170dbbdb",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Agente Generador de Imágenes",
+        "height": 352,
+        "width": 624,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1984,
+        0
+      ],
+      "id": "1ee9fed5-59c3-40a4-8eb5-ae631f512dde",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.chat.id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1264,
+        464
+      ],
+      "id": "7b19d85d-97db-41fa-bac1-97ef02b15f6e",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1136,
+        464
+      ],
+      "id": "d74a85ec-0063-41f7-8029-95b564d56e0a",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "vAwRcy26hTQrHBPN",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Llama a esta herramienta para editar una imagen. Debes pasar un nuevo título de imagen, una instrucción de imagen y el ID de la imagen.",
+        "workflowId": {
+          "__rl": true,
+          "value": "R4bYvrMB0CI0dPQU",
+          "mode": "list",
+          "cachedResultName": "editar img nanobanana"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "imageTitle": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('imageTitle', `El título de la nueva imagen`, 'string') }}",
+            "imagePrompt": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('imagePrompt', ``, 'string') }}",
+            "imageID": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('imageID', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "imageTitle",
+              "displayName": "imageTitle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "imagePrompt",
+              "displayName": "imagePrompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "imageID",
+              "displayName": "imageID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1600,
+        464
+      ],
+      "id": "63b21bb4-6c34-4a38-a58c-ab0431c3f4a5",
+      "name": "Editar Imagen"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1472,
+        176
+      ],
+      "id": "a9df08ce-0002-4229-b699-4daa478b2468",
+      "name": "Get a file",
+      "webhookId": "49c9b7bf-1f36-4131-aa2a-6df5d3122828",
+      "credentials": {
+        "telegramApi": {
+          "id": "l1U9WXgTJmontEBM",
+          "name": "jacobot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1616,
+        176
+      ],
+      "id": "63774646-2df4-4245-92db-53958db0c8b6",
+      "name": "Transcribe a recording",
+      "credentials": {
+        "openAiApi": {
+          "id": "vAwRcy26hTQrHBPN",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "35bbde69-f7bc-45af-9923-903655277bad",
+              "name": "message.text",
+              "value": "=el usuario envío un audio, esta es la transcripción: {{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1760,
+        176
+      ],
+      "id": "8f6164a1-337b-4920-a77d-060baa06a46f",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-5-mini",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        464
+      ],
+      "id": "e5123654-3bb4-4df1-8dc6-d6de2b318a3b",
+      "name": "gpt 5 mini",
+      "credentials": {
+        "openRouterApi": {
+          "id": "le2gHg2t82OjuSTE",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Usa esta herramienta para generar 5 miniaturas profesionales de YouTube. Necesitas pasar el título del video, el tema principal, y el ID de una foto base del usuario.",
+        "workflowId": {
+          "__rl": true,
+          "value": "TxVIMVSo73hHVR7v",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "videoTitle": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('videoTitle', 'Título del video de YouTube', 'string') }}",
+            "videoTopic": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('videoTopic', 'Tema principal del video', 'string') }}",
+            "basePhotoID": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('basePhotoID', 'ID de la foto base en Google Drive', 'string') }}"
+          },
+          "schema": [
+            {
+              "id": "videoTitle",
+              "displayName": "videoTitle",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "id": "videoTopic",
+              "displayName": "videoTopic",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "id": "basePhotoID",
+              "displayName": "basePhotoID",
+              "required": true,
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "46a6a8bb-e7c4-4cc6-a5e4-0edf609bc99f",
+      "name": "Generar Miniaturas YouTube",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "GWod04GN5caOuUZJ",
+          "mode": "list",
+          "cachedResultName": "GPT-4o Mini Vision Tool"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "imageID": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('imageID', ``, 'string') }}",
+            "analysisType": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('analysisType', ``, 'string') }}",
+            "prompt": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('prompt', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "imageID",
+              "displayName": "imageID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "analysisType",
+              "displayName": "analysisType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "prompt",
+              "displayName": "prompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2784,
+        464
+      ],
+      "id": "0f25ba9e-9a7f-4c77-844c-424d732fc201",
+      "name": "visionTool"
+    },
+    {
+      "parameters": {
+        "content": "## Youtube Tools",
+        "height": 224,
+        "width": 304,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2304,
+        384
+      ],
+      "typeVersion": 1,
+      "id": "b01fe2ca-522d-41b8-a468-1195a2be9085",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "acc14387-0455-4033-8988-26e04f9296a2",
+              "leftValue": "={{ $json.message.caption }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1312,
+        0
+      ],
+      "id": "cf878860-9305-43b5-bf25-7347f6fc59b5",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Telegram Trigger').item.json.message.photo[1].file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1472,
+        -160
+      ],
+      "id": "043054ac-f40f-40dd-979a-c21403da5da0",
+      "name": "Download File1",
+      "webhookId": "3aac77a9-f818-433f-a1f0-c26f66a21088",
+      "credentials": {
+        "telegramApi": {
+          "id": "l1U9WXgTJmontEBM",
+          "name": "jacobot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "={{ $now.format('yyyy-MM-dd') }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "11XdqRpfnY6nHkdrM3W81nJaFhWx3Kan4",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1616,
+        -160
+      ],
+      "id": "35d51d7a-5887-4cb5-8b4a-269d5e224ad3",
+      "name": "Upload file1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "nDbhcQKFf7NIXVC6",
+          "name": "danielcarreong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "53de4eb0-6684-48f5-a5b5-2b3bedaff817",
+              "name": "message.text",
+              "value": "=El usuario acaba de enviar una imagen. Aquí está el ID de ese archivo en Google Drive: {{ $json.id }}\n\neste fue el caption text: {{ $('Telegram Trigger').item.json.message.caption }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1760,
+        -160
+      ],
+      "id": "c2bfc874-a188-4b18-ad9d-36a2f60369ed",
+      "name": "Set Text1"
+    },
+    {
+      "parameters": {
+        "description": "Llama a esta herramienta para combinar dos imágenes. Debes pasar una instrucción de generación de imágenes, los ID de ambas imágenes y un título para esta nueva imagen.",
+        "workflowId": {
+          "__rl": true,
+          "value": "tscwyz41PTftbvhg",
+          "mode": "list",
+          "cachedResultName": "Combinar Imagenes yt"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "prompt": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('prompt', ``, 'string') }}",
+            "image1": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('image1', ``, 'string') }}",
+            "image2": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('image2', ``, 'string') }}",
+            "imageTitle": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('imageTitle', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "prompt",
+              "displayName": "prompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "image1",
+              "displayName": "image1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "image2",
+              "displayName": "image2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "imageTitle",
+              "displayName": "imageTitle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1472,
+        464
+      ],
+      "id": "12f3ddb3-87e3-43f5-95db-404c25d9b78b",
+      "name": "Combinar imágenes"
+    },
+    {
+      "parameters": {
+        "description": "Llama a esta herramienta para combinar dos imágenes. Debes pasar una instrucción de generación de imágenes, los ID de ambas imágenes y un título para esta nueva imagen.",
+        "workflowId": {
+          "__rl": true,
+          "value": "bIUtiBOm7qMtM1Xc",
+          "mode": "list",
+          "cachedResultName": "Miniaturas YouTube (5 Estilos)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "prompt": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('prompt', ``, 'string') }}",
+            "image1": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('image1', ``, 'string') }}",
+            "image2": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('image2', ``, 'string') }}",
+            "imageTitle": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('imageTitle', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "prompt",
+              "displayName": "prompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "image1",
+              "displayName": "image1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "image2",
+              "displayName": "image2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "imageTitle",
+              "displayName": "imageTitle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2336,
+        464
+      ],
+      "id": "2937b3c8-6109-4f89-bf3f-0ba5cb702337",
+      "name": "Miniaturas_YT"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Set Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Text": {
+      "main": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Photoshop Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Change Name": {
+      "ai_tool": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Raw Files": {
+      "ai_tool": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search AI Images": {
+      "ai_tool": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Editar Imagen": {
+      "ai_tool": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a file": {
+      "main": [
+        [
+          {
+            "node": "Transcribe a recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe a recording": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gpt 5 mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "visionTool": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "Generar Miniaturas YouTube": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Download File1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File1": {
+      "main": [
+        [
+          {
+            "node": "Upload file1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file1": {
+      "main": [
+        [
+          {
+            "node": "Set Text1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Text1": {
+      "main": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combinar imágenes": {
+      "ai_tool": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Miniaturas_YT": {
+      "ai_tool": [
+        [
+          {
+            "node": "Photoshop Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "aa8ec773-2e54-4899-a1dd-e68b56e7b487",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "18b593ec5af58b5d99fb77aba6da0f7a96282f03203ce9230e5420a63cda83ad"
+  },
+  "id": "DUTTBynaY5puEpWL",
+  "tags": []
+}
