@@ -81,14 +81,40 @@ export default function HomePage() {
       }
 
       const data: ApiResponse = await response.json()
+      console.log('📦 Raw API response:', data)
+
       // Transform API response to store format
-      const transformedImages = data.images.map(img => ({
-        ...img,
-        isSelected: false,
-        createdAt: new Date(img.timestamp)
-      }))
+      const transformedImages = data.images.map((img, index) => {
+        console.log(`🖼️ Image ${index}:`, img)
+
+        // Fix URL if it's an object (extract the actual URL string)
+        let imageUrl = img.url
+        console.log(`🔍 Original URL for image ${index}:`, imageUrl, typeof imageUrl)
+
+        if (typeof imageUrl === 'object' && imageUrl !== null) {
+          console.log(`⚠️ URL is an object:`, imageUrl)
+          // If URL is an object, try to extract the actual URL
+          imageUrl = imageUrl.url || imageUrl.href || imageUrl.src || Object.values(imageUrl)[0] || imageUrl.toString()
+        }
+
+        // Additional safety check
+        if (typeof imageUrl === 'string' && imageUrl === '[object Object]') {
+          console.error(`❌ URL is still '[object Object]' after fix attempt for image ${index}`)
+          imageUrl = `https://via.placeholder.com/640x360?text=Error+Loading+Image`
+        }
+
+        console.log(`🔗 Final URL for image ${index}:`, imageUrl, typeof imageUrl)
+
+        return {
+          ...img,
+          url: imageUrl, // Use the fixed URL
+          isSelected: false,
+          createdAt: new Date(img.timestamp)
+        }
+      })
       setGeneratedImages(transformedImages)
       console.log(`✅ Generated ${data.total} images successfully`)
+      console.log('🎨 Transformed images:', transformedImages)
 
     } catch (error) {
       console.error('❌ Generation failed:', error)
@@ -178,8 +204,13 @@ export default function HomePage() {
                   className="w-full h-32 object-cover"
                   loading="lazy"
                   onError={(e) => {
-                    console.error('❌ Image failed to load:', image.url, e)
+                    console.error('❌ Image failed to load:')
+                    console.error('  URL:', image.url)
+                    console.error('  Type of URL:', typeof image.url)
+                    console.error('  Image object:', image)
+                    console.error('  Error event:', e)
                     e.currentTarget.style.border = '2px solid red'
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 0, 0, 0.1)'
                   }}
                   onLoad={() => console.log('✅ Image loaded successfully:', image.url)}
                 />

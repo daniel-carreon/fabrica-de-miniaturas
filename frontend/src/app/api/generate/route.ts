@@ -75,11 +75,19 @@ export async function POST(request: NextRequest) {
           }
         ) as string[]
 
+        console.log(`🔍 Batch ${i + 1} raw output:`, output)
+        console.log(`🔍 Batch ${i + 1} output type:`, typeof output)
+        console.log(`🔍 Batch ${i + 1} is array:`, Array.isArray(output))
+
         if (Array.isArray(output)) {
+          output.forEach((item, idx) => {
+            console.log(`  Item ${idx}: type=${typeof item}, value=${item}`)
+          })
           allImages.push(...output)
           console.log(`✅ Batch ${i + 1}: Generated ${output.length} images successfully`)
         } else {
           console.warn(`⚠️ Batch ${i + 1}: Unexpected output format:`, typeof output)
+          console.warn(`⚠️ Batch ${i + 1}: Raw output:`, output)
         }
       } catch (batchError) {
         console.error(`❌ Batch ${i + 1} failed:`, batchError)
@@ -95,12 +103,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform URLs to GeneratedImage objects
-    const generatedImages: GeneratedImage[] = allImages.map((url, index) => ({
-      id: `img_${Date.now()}_${index}`,
-      url,
-      prompt: enhancedPrompt,
-      timestamp: Date.now()
-    }))
+    const generatedImages: GeneratedImage[] = allImages.map((url, index) => {
+      // Ensure URL is a string, not an object
+      const imageUrl = typeof url === 'string' ? url : String(url)
+      console.log(`🔗 Processing image ${index}: URL type=${typeof url}, value=${imageUrl}`)
+
+      return {
+        id: `img_${Date.now()}_${index}`,
+        url: imageUrl,
+        prompt: enhancedPrompt,
+        timestamp: Date.now()
+      }
+    })
 
     console.log(`🎉 Successfully generated ${generatedImages.length} images total`)
 
