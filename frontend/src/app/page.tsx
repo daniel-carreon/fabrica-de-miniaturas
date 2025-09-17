@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useImageStore } from '@/shared/stores/imageStore'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
@@ -19,6 +19,7 @@ interface ApiResponse {
 export default function HomePage() {
   const [prompt, setPrompt] = useState('')
   const [numImages, setNumImages] = useState(10)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const {
     isGenerating,
     generatedImages,
@@ -26,6 +27,16 @@ export default function HomePage() {
     setGeneratedImages,
     clearGenerated
   } = useImageStore()
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedImage) {
+        setSelectedImage(null)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [selectedImage])
 
   const handleSaveFavorite = async (image: { id: string; url: string; prompt: string }) => {
     try {
@@ -126,55 +137,57 @@ export default function HomePage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      {/* Prompt Input Section */}
-      <GlassCard variant="dark" className="purple-glow">
-        <h2 className="text-xl font-bold mb-6 text-white">🎨 Generate Images</h2>
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="prompt" className="block text-sm font-medium mb-2 text-purple-200">
-              Describe your image
-            </label>
-            <textarea
-              id="prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="DANI portrait for tech review thumbnail"
-              className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg backdrop-blur-sm text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition-all"
-              rows={3}
-              disabled={isGenerating}
-            />
-          </div>
-          <div>
-            <label htmlFor="numImages" className="block text-sm font-medium mb-2 text-purple-200">
-              Number of images: <span className="text-purple-400 font-bold">{numImages}</span>
-            </label>
-            <input
-              id="numImages"
-              type="range"
-              min="1"
-              max="10"
-              value={numImages}
-              onChange={(e) => setNumImages(parseInt(e.target.value))}
-              className="w-full h-2 bg-purple-900/30 rounded-lg appearance-none cursor-pointer slider accent-purple-500"
-              disabled={isGenerating}
-            />
-            <div className="flex justify-between text-xs text-purple-300 mt-1">
-              <span>1</span>
-              <span>5</span>
-              <span>10</span>
+      {/* Generate Images Section - Hidden: Now using Chat Agent */}
+      {false && (
+        <GlassCard variant="dark" className="purple-glow">
+          <h2 className="text-xl font-bold mb-6 text-white">🎨 Generate Images</h2>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="prompt" className="block text-sm font-medium mb-2 text-purple-200">
+                Describe your image
+              </label>
+              <textarea
+                id="prompt"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="DANI portrait for tech review thumbnail"
+                className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg backdrop-blur-sm text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition-all"
+                rows={3}
+                disabled={isGenerating}
+              />
             </div>
+            <div>
+              <label htmlFor="numImages" className="block text-sm font-medium mb-2 text-purple-200">
+                Number of images: <span className="text-purple-400 font-bold">{numImages}</span>
+              </label>
+              <input
+                id="numImages"
+                type="range"
+                min="1"
+                max="10"
+                value={numImages}
+                onChange={(e) => setNumImages(parseInt(e.target.value))}
+                className="w-full h-2 bg-purple-900/30 rounded-lg appearance-none cursor-pointer slider accent-purple-500"
+                disabled={isGenerating}
+              />
+              <div className="flex justify-between text-xs text-purple-300 mt-1">
+                <span>1</span>
+                <span>5</span>
+                <span>10</span>
+              </div>
+            </div>
+            <LiquidButton
+              onClick={handleGenerate}
+              disabled={isGenerating || !prompt.trim()}
+              variant="space"
+              size="xl"
+              className="disabled:opacity-50"
+            >
+              {isGenerating ? '🚀 Generating...' : `✨ Generate ${numImages} Images`}
+            </LiquidButton>
           </div>
-          <LiquidButton
-            onClick={handleGenerate}
-            disabled={isGenerating || !prompt.trim()}
-            variant="space"
-            size="xl"
-            className="disabled:opacity-50"
-          >
-            {isGenerating ? '🚀 Generating...' : `✨ Generate ${numImages} Images`}
-          </LiquidButton>
-        </div>
-      </GlassCard>
+        </GlassCard>
+      )}
 
       {/* Status Section */}
       {isGenerating && (
@@ -201,8 +214,9 @@ export default function HomePage() {
                 <img
                   src={image.url}
                   alt={`Generated from: ${image.prompt}`}
-                  className="w-full h-32 object-cover"
+                  className="w-full h-32 object-cover cursor-pointer hover:scale-105 transition-transform"
                   loading="lazy"
+                  onClick={() => setSelectedImage(image.url)}
                   onError={(e) => {
                     console.error('❌ Image failed to load:')
                     console.error('  URL:', image.url)
@@ -243,6 +257,29 @@ export default function HomePage() {
             </p>
           </div>
         </GlassCard>
+      )}
+
+      {/* Image Modal */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] w-full">
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute -top-4 -right-4 bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl font-bold transition-colors z-10"
+            >
+              ✕
+            </button>
+            <img
+              src={selectedImage}
+              alt="Imagen ampliada"
+              className="w-full h-full object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
       )}
     </div>
   )

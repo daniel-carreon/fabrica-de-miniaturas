@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useChatStore } from '../stores/chatStore'
+import { useImageStore } from '@/shared/stores/imageStore'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
 
@@ -22,6 +23,8 @@ export default function ChatAgent() {
     clearMessages
   } = useChatStore()
 
+  const { setGeneratedImages } = useImageStore()
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
 
@@ -39,7 +42,7 @@ export default function ChatAgent() {
     try {
       console.log('🤖 Sending message to OpenRouter:', userMessage.content)
 
-      const response = await fetch('/api/chat', {
+      const response = await fetch('http://localhost:8000/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,6 +60,23 @@ export default function ChatAgent() {
 
       const data = await response.json()
       console.log('✅ OpenRouter response:', data)
+
+      // If tool was used and returned images, add them to gallery
+      if (data.tool_used === 'generate_images' && data.tool_result?.images) {
+        console.log('🎨 Processing generated images from chat tool:', data.tool_result)
+
+        // Transform tool_result images to imageStore format
+        const transformedImages = data.tool_result.images.map((img: any) => ({
+          id: img.id,
+          url: img.url,
+          prompt: img.prompt,
+          isSelected: false,
+          createdAt: new Date(img.timestamp)
+        }))
+
+        setGeneratedImages(transformedImages)
+        console.log('✅ Images added to gallery:', transformedImages)
+      }
 
       const assistantMessage: ChatMessage = {
         id: `msg_${Date.now()}_assistant`,

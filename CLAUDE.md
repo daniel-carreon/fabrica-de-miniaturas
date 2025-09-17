@@ -107,9 +107,17 @@ proyecto/
 ## 🛠️ Comandos Importantes
 
 ### Development
-- `npm run dev` - Servidor de desarrollo
+- `npm run dev` - Servidor de desarrollo (puerto 3000 por defecto)
 - `npm run build` - Build para producción
 - `npm run preview` - Preview del build
+- `uvicorn main:app --reload` - Backend Python (puerto 8000 por defecto)
+
+### 🚨 CONFIGURACIÓN DE PUERTOS (SYSTEM PROMPT)
+**FRONTEND DEFAULT: localhost:3000**
+**BACKEND DEFAULT: localhost:8000**
+- Backend siempre debe apuntar a FRONTEND_URL = "http://localhost:3000"
+- Esta configuración es crítica para tool calling chat → replicate
+- Grabar cualquier cambio de puertos en esta sección
 
 ### Quality Assurance
 - `npm run test` - Ejecutar tests
