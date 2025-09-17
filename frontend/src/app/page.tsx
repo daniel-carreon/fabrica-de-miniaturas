@@ -5,6 +5,7 @@ import { useImageStore } from '@/shared/stores/imageStore'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
 import { Download, Maximize2, Heart, Upload, FileImage, Trash2, Tag, Clock } from 'lucide-react'
+import ImageCard from '@/components/ui/ImageCard'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
 
 interface ApiResponse {
@@ -579,169 +580,55 @@ export default function HomePage() {
           </div>
           <div className="image-grid">
             {generatedImages.map((image) => (
-              <div key={image.id} className={`image-card group relative cursor-pointer transition-all ${
-                isImageSelected(image.id) ? 'ring-4 ring-purple-500 ring-opacity-80' : 'hover:ring-2 hover:ring-purple-300'
-              }`}
-                onClick={() => handleImageSelect(image.id, image.url, 'generated')}
-              >
-                {selectionMode ? (
-                  <div className="absolute top-2 left-2 z-10">
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
-                      image.isSelected
-                        ? 'bg-purple-500 border-purple-500 text-white'
-                        : 'bg-black/50 border-white text-white'
-                    }`}>
-                      {image.isSelected ? '✓' : ''}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded-full">
-                    ✨ New
-                  </div>
-                )}
-
-                {/* Selection indicator */}
-                {isImageSelected(image.id) && (
-                  <div className="absolute top-2 right-2 bg-purple-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">
-                    ✓
-                  </div>
-                )}
-                <img
-                  src={image.url}
-                  alt={`Generated from: ${image.prompt}`}
-                  className="w-full h-32 object-cover cursor-pointer hover:scale-105 transition-transform"
-                  loading="lazy"
-                  onClick={() => selectionMode ? toggleImageSelection(image.id) : null}
-                  onError={(e) => {
-                    console.error('❌ Image failed to load:')
-                    console.error('  URL:', image.url)
-                    console.error('  Type of URL:', typeof image.url)
-                    console.error('  Image object:', image)
-                    console.error('  Error event:', e)
-                    e.currentTarget.style.border = '2px solid red'
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 0, 0, 0.1)'
-                  }}
-                  onLoad={() => console.log('✅ Image loaded successfully:', image.url)}
-                />
-                {/* Subtle hover icons */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <div className="flex gap-1">
-                    {/* Download */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDownloadImage(image)
-                      }}
-                      className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                      title="Download image"
-                    >
-                      <Download className="w-4 h-4 text-white" />
-                    </button>
-
-                    {/* Maximize */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedImage(image.url)
-                      }}
-                      className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                      title="View fullscreen"
-                    >
-                      <Maximize2 className="w-4 h-4 text-white" />
-                    </button>
-
-                    {/* Save favorite */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleSaveFavorite(image)
-                      }}
-                      className="w-8 h-8 bg-black/70 hover:bg-purple-600/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                      title="Save to favorites"
-                    >
-                      <Heart className="w-4 h-4 text-white" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <ImageCard
+                key={image.id}
+                id={image.id}
+                url={image.url}
+                source="generated"
+                prompt={image.prompt}
+                metadata={{
+                  timestamp: image.createdAt?.toLocaleString() || 'Unknown',
+                  model: 'Flux Dev + DANI LoRA'
+                }}
+                onToggleFavorite={(id) => {
+                  const imageToSave = generatedImages.find(img => img.id === id)
+                  if (imageToSave) handleSaveFavorite(imageToSave)
+                }}
+                onDelete={(id) => {
+                  setGeneratedImages(prev => prev.filter(img => img.id !== id))
+                }}
+              />
             ))}
 
             {/* Historical images from database */}
             {generatedHistory.map((historyImage) => (
-              <div key={`history-${historyImage.id}`} className="image-card group relative">
-                <img
-                  src={historyImage.replicate_url}
-                  alt={`Generated: ${historyImage.prompt}`}
-                  className="w-full h-32 object-cover cursor-pointer hover:scale-105 transition-transform"
-                  loading="lazy"
-                  onClick={() => setSelectedImage(historyImage.replicate_url)}
-                />
-
-                {/* Hover controls */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <div className="flex gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDownloadImage({
-                          id: historyImage.id,
-                          url: historyImage.replicate_url,
-                          prompt: historyImage.prompt
-                        })
-                      }}
-                      className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                      title="Download image"
-                    >
-                      <Download className="w-4 h-4 text-white" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedImage(historyImage.replicate_url)
-                      }}
-                      className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                      title="View fullscreen"
-                    >
-                      <Maximize2 className="w-4 h-4 text-white" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleSaveFavorite({
-                          id: historyImage.image_id,
-                          url: historyImage.replicate_url,
-                          prompt: historyImage.prompt
-                        })
-                      }}
-                      className="w-8 h-8 bg-black/70 hover:bg-purple-600/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                      title="Save to favorites"
-                    >
-                      <Heart className="w-4 h-4 text-white" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* History badge */}
-                <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
-                  📚 History
-                </div>
-
-                {/* Info overlay */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-white text-xs truncate">{historyImage.prompt}</p>
-                  <div className="flex items-center justify-between text-gray-300 text-xs mt-1">
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      <span>{new Date(historyImage.generated_at).toLocaleDateString()}</span>
-                    </div>
-                    {historyImage.model_version && (
-                      <span className="text-purple-300 text-xs">
-                        {historyImage.model_version.split('/').pop()?.split(':')[0]}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <ImageCard
+                key={`history-${historyImage.id}`}
+                id={historyImage.id}
+                url={historyImage.replicate_url}
+                source="generated"
+                prompt={historyImage.prompt}
+                metadata={{
+                  timestamp: new Date(historyImage.generated_at).toLocaleString(),
+                  model: 'Flux Dev + DANI LoRA',
+                  type: 'Historical Generation',
+                  quality_score: historyImage.quality_score,
+                  session: historyImage.generation_session
+                }}
+                onToggleFavorite={async (id) => {
+                  const imageToSave = {
+                    id: historyImage.image_id,
+                    url: historyImage.replicate_url,
+                    prompt: historyImage.prompt,
+                    isSelected: false,
+                    createdAt: new Date(historyImage.generated_at)
+                  }
+                  await handleSaveFavorite(imageToSave)
+                }}
+                onDelete={(id) => {
+                  setGeneratedHistory(prev => prev.filter(img => img.id !== id))
+                }}
+              />
             ))}
           </div>
         </GlassCard>
@@ -771,67 +658,22 @@ export default function HomePage() {
           ) : (
             <div className="image-grid">
               {favorites.map((favorite) => (
-                <div key={favorite.id} className={`image-card group relative cursor-pointer transition-all ${
-                  isImageSelected(favorite.id) ? 'ring-4 ring-purple-500 ring-opacity-80' : 'hover:ring-2 hover:ring-purple-300'
-                }`}
-                  onClick={() => handleImageSelect(favorite.id, favorite.supabase_url || favorite.original_url, 'favorites')}
-                >
-                  <img
-                    src={favorite.supabase_url || favorite.original_url}
-                    alt={`Favorite: ${favorite.prompt}`}
-                    className="w-full h-32 object-cover cursor-pointer hover:scale-105 transition-transform"
-                    loading="lazy"
-                    onClick={() => setSelectedImage(favorite.supabase_url || favorite.original_url)}
-                  />
-
-                  {/* Hover controls */}
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <div className="flex gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDownloadImage({
-                            id: favorite.id,
-                            url: favorite.supabase_url || favorite.original_url,
-                            prompt: favorite.prompt
-                          })
-                        }}
-                        className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                        title="Download image"
-                      >
-                        <Download className="w-4 h-4 text-white" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedImage(favorite.supabase_url || favorite.original_url)
-                        }}
-                        className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                        title="View fullscreen"
-                      >
-                        <Maximize2 className="w-4 h-4 text-white" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Selection indicator */}
-                  {isImageSelected(favorite.id) && (
-                    <div className="absolute top-2 right-2 bg-purple-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">
-                      ✓
-                    </div>
-                  )}
-
-                  {/* Info overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <p className="text-white text-xs truncate">{favorite.prompt}</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <Clock className="w-3 h-3 text-gray-400" />
-                      <span className="text-gray-300 text-xs">
-                        {new Date(favorite.saved_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                <ImageCard
+                  key={favorite.id}
+                  id={favorite.id}
+                  url={favorite.supabase_url || favorite.original_url}
+                  source="favorites"
+                  prompt={favorite.prompt}
+                  metadata={{
+                    savedAt: new Date(favorite.saved_at).toLocaleDateString(),
+                    originalModel: favorite.model_version || 'Unknown'
+                  }}
+                  onDelete={(id) => {
+                    if (confirm('¿Remover de favoritos?')) {
+                      setFavorites(prev => prev.filter(fav => fav.id !== id))
+                    }
+                  }}
+                />
               ))}
             </div>
           )}
@@ -921,85 +763,20 @@ export default function HomePage() {
           ) : (
             <div className="image-grid">
               {uploads.map((upload) => (
-                <div key={upload.id} className={`image-card group relative cursor-pointer transition-all ${
-                  isImageSelected(upload.id) ? 'ring-4 ring-purple-500 ring-opacity-80' : 'hover:ring-2 hover:ring-purple-300'
-                }`}
-                  onClick={() => handleImageSelect(upload.id, upload.public_url, 'uploads')}
-                >
-                  <img
-                    src={upload.public_url}
-                    alt={upload.description || upload.filename}
-                    className="w-full h-32 object-cover cursor-pointer hover:scale-105 transition-transform"
-                    loading="lazy"
-                    onClick={() => setSelectedImage(upload.public_url)}
-                  />
-
-                  {/* Hover controls */}
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <div className="flex gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDownloadImage({
-                            id: upload.id,
-                            url: upload.public_url,
-                            prompt: upload.description || upload.filename
-                          })
-                        }}
-                        className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                        title="Download image"
-                      >
-                        <Download className="w-4 h-4 text-white" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedImage(upload.public_url)
-                        }}
-                        className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                        title="View fullscreen"
-                      >
-                        <Maximize2 className="w-4 h-4 text-white" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteUpload(upload.id)
-                        }}
-                        className="w-8 h-8 bg-black/70 hover:bg-red-600/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                        title="Delete image"
-                      >
-                        <Trash2 className="w-4 h-4 text-white" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Selection indicator */}
-                  {isImageSelected(upload.id) && (
-                    <div className="absolute top-2 right-2 bg-purple-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">
-                      ✓
-                    </div>
-                  )}
-
-                  {/* Info overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <p className="text-white text-xs truncate">
-                      {upload.description || upload.filename}
-                    </p>
-                    <div className="flex items-center justify-between text-gray-300 text-xs mt-1">
-                      <span>{formatFileSize(upload.file_size)}</span>
-                      <span>{new Date(upload.uploaded_at).toLocaleDateString()}</span>
-                    </div>
-                    {upload.tags.length > 0 && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <Tag className="w-3 h-3 text-gray-400" />
-                        <span className="text-gray-400 text-xs truncate">
-                          {upload.tags.join(', ')}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <ImageCard
+                  key={upload.id}
+                  id={upload.id}
+                  url={upload.public_url}
+                  source="uploads"
+                  prompt={upload.description || upload.filename}
+                  metadata={{
+                    filename: upload.filename,
+                    fileSize: formatFileSize(upload.file_size),
+                    uploadedAt: new Date(upload.uploaded_at).toLocaleDateString(),
+                    tags: upload.tags.join(', ') || 'No tags'
+                  }}
+                  onDelete={(id) => handleDeleteUpload(id)}
+                />
               ))}
             </div>
           )}

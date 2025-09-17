@@ -19,9 +19,15 @@ class ChatMessage(BaseModel):
     content: str
     timestamp: str
 
+class SelectedImage(BaseModel):
+    id: str
+    url: str
+    source: str
+
 class ChatRequest(BaseModel):
     message: str
     messages: List[ChatMessage] = []
+    selectedImages: List[SelectedImage] = []
 
 class ChatResponse(BaseModel):
     response: str
@@ -290,8 +296,18 @@ def extract_prompt_fallback(json_str: str) -> Dict[str, Any]:
 async def chat_endpoint(request: ChatRequest):
     """Chat endpoint with AI agent and tool calling"""
     try:
+        # Build system prompt with selected images context
+        system_content = SYSTEM_PROMPT
+
+        if request.selectedImages:
+            images_context = "\n\nSELECTED IMAGES CONTEXT:\n"
+            for i, img in enumerate(request.selectedImages, 1):
+                images_context += f"Image {i}: {img.url} (ID: {img.id}, Source: {img.source})\n"
+            images_context += "\nWhen user asks to combine images, use these URLs as image1_url and image2_url parameters."
+            system_content += images_context
+
         # Prepare messages
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages = [{"role": "system", "content": system_content}]
         for msg in request.messages[-10:]:
             messages.append({"role": msg.role, "content": msg.content})
         messages.append({"role": "user", "content": request.message})

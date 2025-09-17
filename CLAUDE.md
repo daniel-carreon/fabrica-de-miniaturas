@@ -8,16 +8,10 @@
 - **DRY**: Don't Repeat Yourself - Evita duplicación de código
 - **SOLID**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
 
-### Descripción del Proyecto
-[Breve descripción de qué hace tu proyecto y sus características principales]
-
   🎨 FILOSOFÍA DE DESARROLLO:
 
   "Build what you need, when you need it" - No over-engineering, no feature creep. Perfecto.
-
-  "Leverage existing work" - Tu N8N es un asset, no un legacy. Inteligente.
-
-  "User feedback loop" - Tú eres el product manager y el user. Ideal para MVP.
+  "Leverage existing work"
 
 ## 🏗️ Tech Stack & Architecture
 
@@ -117,7 +111,6 @@ proyecto/
 **BACKEND DEFAULT: localhost:8000**
 - Backend siempre debe apuntar a FRONTEND_URL = "http://localhost:3000"
 - Esta configuración es crítica para tool calling chat → replicate
-- Grabar cualquier cambio de puertos en esta sección
 
 ### Quality Assurance
 - `npm run test` - Ejecutar tests
@@ -277,18 +270,6 @@ docs(readme): update installation steps
 - ❌ No mezclar concerns en un componente
 - ❌ No usar global state innecesariamente
 
-## 📚 Referencias & Context
-
-### Project Files
-- Ver @README.md para overview detallado
-- Ver @package.json para scripts disponibles
-- Ver @.claude/docs/ para workflows y documentación
-- Ver @.mcp.json.examples para MCPs disponibles
-
-### External Dependencies
-- Documentación oficial de frameworks
-- Best practices guides
-- Security guidelines (OWASP)
 
 ## 🤖 AI Assistant Guidelines
 
@@ -651,22 +632,36 @@ claude-code --debug --mcp-verbose
 
 ---
 
-## 🎯 **ESTADO ACTUAL DEL PROYECTO (Diciembre 2024)**
+## 🎯 **ESTADO ACTUAL DEL PROYECTO (Septiembre 2024)**
 
-### ✅ **COMPLETADO - MVP FUNCIONANDO**
-1. **Chat Agent → Replicate Pipeline** ✅
+### ✅ **COMPLETADO - MVP AVANZADO FUNCIONANDO**
+
+#### **1. Chat Agent → Replicate Pipeline** ✅
    - Tool calling funciona perfecto con OpenRouter + gpt-5-mini
    - Detecta "una imagen" vs "varias imágenes" correctamente
    - System prompt: TRIGGER WORD es "DANI" (crítico recordar)
    - Backend Python FastAPI (puerto 8000) → Frontend React (puerto 3000)
    - Las imágenes aparecen automáticamente en gallery después del chat
 
-2. **Resizer Handle** ✅ - Modal de imágenes ✅ - UX optimizado ✅
+#### **2. Sistema de Combinación de Imágenes Conversacional** ✅ **NUEVO!**
+   - **UI/UX completamente rediseñado**: Cards minimalistas con selección visual
+   - **Workflow funcional**: Usuario selecciona 2 imágenes → Chat detecta → "combina estas dos"
+   - **Backend integrado**: `combine_images` tool con Gemini 2.5 Flash (Nano Banana)
+   - **React Context**: Sistema de selección unificado entre dashboard y chat
+   - **Modal expandido**: Metadata completa solo al ampliar imagen
 
-3. **Configuración Crítica Documentada:**
-   - FRONTEND_URL = "http://localhost:3000" (NO 3005!)
+#### **3. Arquitectura UI/UX Profesional** ✅ **NUEVO!**
+   - **Componente unificado**: `ImageCard.tsx` reemplaza 3 implementaciones
+   - **Sistema de selección visual**: Checkboxes + rings púrpuras + counter
+   - **Hover controls elegantes**: Download, Expand, Favorite, Delete
+   - **Modal informativo**: Toda la metadata organizada al ampliar
+   - **Buttons funcionales**: Delete con confirmación, Toggle favorites
+
+#### **4. Configuración Crítica Documentada:**
+   - **FRONTEND_URL = "http://localhost:3000"** (puerto principal)
+   - **BACKEND_URL = "http://localhost:8000"** (puerto principal)
    - max_tokens = 1500 (crítico para tool arguments largos)
-   - Modelo actual: daniel-carreon/danielcarrong:56c9356f (190 runs exitosos)
+   - Modelo actual: daniel-carreon/danielcarrong:56c9356f (190+ runs exitosos)
 
 ## 🚀 **ROADMAP PRÓXIMAS FASES - FÁBRICA DE MINIATURAS**
 
@@ -741,66 +736,6 @@ TOOLS = [
 ]
 ```
 
-### **Storage Strategy Decision Pending**
-```
-DILEMA: ¿Supabase buckets vs Replicate URLs?
-- Replicate: URLs temporales, no control, más simple
-- Supabase: Storage permanente, más complejo, control total
-
-RECOMENDACIÓN TÉCNICA: Híbrido
-- Generación inicial: usar URLs temporales Replicate
-- Favoritos/finales: guardar en Supabase buckets
-- Metadata: siempre en Supabase database
-```
-
-## 📊 **ARQUITECTURA DE DATOS - CIENTÍFICO DE DATOS**
-
-### **Estructura Actual de Base de Datos (Diciembre 2024)**
-
-#### **Tablas Implementadas:**
-```sql
--- 1. GENERATED_IMAGES: Registro completo de generaciones IA (43 registros)
-CREATE TABLE generated_images (
-    id UUID PRIMARY KEY,
-    image_id TEXT UNIQUE,                    -- ID único de Replicate
-    replicate_url TEXT NOT NULL,            -- URL temporal de Replicate
-    prompt TEXT NOT NULL,                   -- Prompt original
-    model_version TEXT,                     -- daniel-carreon/danielcarrong:56c9356f
-    model_parameters JSONB DEFAULT '{}',    -- Parámetros de generación
-    generation_session TEXT,                -- Sesión de batch
-    generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    tags TEXT[] DEFAULT '{}',               -- Tags para categorización
-    quality_score DOUBLE PRECISION,        -- Score de calidad (futuro ML)
-    is_combined BOOLEAN DEFAULT FALSE,     -- Si es resultado de combinación
-    parent_images TEXT[]                    -- URLs de imágenes padre
-);
-
--- 2. USER_UPLOADS: Archivos subidos por usuarios (1 registro)
-CREATE TABLE user_uploads (
-    id UUID PRIMARY KEY,
-    filename TEXT NOT NULL,
-    storage_path TEXT NOT NULL,             -- Path en Supabase Storage
-    public_url TEXT NOT NULL,               -- URL pública CDN
-    file_size BIGINT CHECK (file_size <= 52428800), -- 50MB max
-    mime_type TEXT CHECK (mime_type LIKE 'image/%'),
-    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    original_dimensions JSONB DEFAULT '{}',
-    tags TEXT[] DEFAULT '{}',
-    description TEXT,
-    user_id UUID                           -- FK futuro auth
-);
-
--- 3. FAVORITE_IMAGES: Colección curada (2 registros)
-CREATE TABLE favorite_images (
-    id UUID PRIMARY KEY,
-    image_id TEXT NOT NULL,
-    original_url TEXT NOT NULL,            -- URL original
-    supabase_url TEXT,                     -- URL backup en storage
-    prompt TEXT NOT NULL,
-    saved_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
-
 #### **Principios de Diseño de Datos (Científico):**
 1. **Trazabilidad Completa**: Metadata para análisis futuro
 2. **Preparado para ML**: quality_score, tags, parent_images para modelos
@@ -815,53 +750,6 @@ CREATE TABLE favorite_images (
 - Implementé botón manual "Combine Mode" (INCORRECTO)
 - Workflow NO es conversacional como debe ser
 
-### **✅ OBJETIVO CORRECTO:**
-```
-Usuario: "Combina la imagen de DANI sonriendo con la de DANI serio"
-AI Agent: [busca automáticamente] → [encuentra] → [combina] → [resultado]
-```
-
-### **IMPLEMENTACIÓN PENDIENTE:**
-
-#### **1. Backend: combine_images_tool()**
-```python
-# backend/api/chat_router.py
-async def combine_images_tool(image1_url: str, image2_url: str, prompt: str):
-    # 1. Llamar Gemini 2.5 Flash Image Preview via OpenRouter
-    # 2. Procesar combinación con Nano Banana
-    # 3. Guardar en generated_images (is_combined=True, parent_images=[url1,url2])
-    # 4. Retornar URL resultado
-```
-
-#### **2. Sistema Búsqueda Inteligente**
-```python
-async def find_images_by_description(description: str):
-    # Buscar en generated_images, user_uploads, favorite_images
-    # Similarity search en prompts/descriptions
-    # Retornar mejores matches con URLs
-```
-
-#### **3. Integration Gemini 2.5 Flash**
-- Modelo: `google/gemini-2.5-flash-image-preview`
-- Input: 2 image URLs + combination prompt
-- Pricing: $0.30/M input + $2.50/M output + $1.238/K images
-- Referencia: `backend/n8n_templates/Combinar Imagenes yt.json`
-
-#### **4. Remover Botón Manual**
-- Eliminar "Combine Mode" del frontend
-- Solo workflow conversacional natural
-
-## 🔄 **AUTOCOMPACTO CONTEXT RECOVERY**
-
-**AL LLEGAR AL LÍMITE DE CONTEXTO:**
-1. Leer este roadmap completo
-2. **Estado actual**: Dashboard unificado funcionando (3 paneles toggle)
-3. **Siguiente tarea**: Implementar combine_images tool conversacional (eliminar botón manual)
-4. **Objetivo final**: Fábrica de miniaturas con multi-tool agent 100% conversacional
-5. Configuración crítica en sección "CONFIGURACIÓN DE PUERTOS"
-
-**TRIGGER WORD CRÍTICO:** "DANI" - nunca olvidar en system prompts
-
 ### **Información Crítica Contextual (Diciembre 2024):**
 - ✅ **Dashboard Unificado**: 3 paneles toggle funcionando (Generated 43, Favorites 2, Uploads 1)
 - ✅ **Generate Images Tool**: Funcionando perfectamente via chat agent
@@ -872,31 +760,13 @@ async def find_images_by_description(description: str):
 - ✅ **RLS Policies**: Storage configurado correctamente
 - ✅ **Auto-save**: Todas las generaciones se guardan automáticamente
 
----
-
-## 🚀 **INFORMACIÓN PARA PRÓXIMA SESIÓN**
-
-### **Estado del Dashboard (100% Funcional):**
-- ✅ Header simplificado con solo botón AI Assistant circular
-- ✅ Panel controls responsive sin overflow de texto
-- ✅ 3 paneles toggle: Generated (42), Favorites (1), Uploads (1)
-- ✅ Auto-carga de datos desde las 3 fuentes
-- ✅ Upload drag & drop funcionando
-- ✅ Save to favorites funcionando
-
-### **Próxima Tarea CRÍTICA:**
-1. **Eliminar botón "Combine Mode"** del frontend
-2. **Implementar combine_images tool** en backend
-3. **Integrar Gemini 2.5 Flash Image Preview**
-4. **Sistema de búsqueda automática** de imágenes
-5. **Workflow 100% conversacional**
 
 ### **Configuración Actual:**
 - Frontend: localhost:3000
 - Backend: localhost:8000
 - Modelo: daniel-carreon/danielcarrong:56c9356f
-- Storage: Supabase buckets + Replicate URLs
-- Tools: generate_images (✅), combine_images (❌)
+- Storage: Supabase buckets + Replicate URLs (flux model) + OpenRouter URLs (Nano banana model)
+- Tools: generate_images (✅), combine_images (✅)
 
 ---
 
