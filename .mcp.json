@@ -17,17 +17,6 @@
         "SUPABASE_ACCESS_TOKEN": "sbp_c4a033bab359a4c4dc66d883e718602d6a8ac33c"
       }
     },
-    "n8n-mcp": {
-      "command": "npx",
-      "args": ["n8n-mcp"],
-      "env": {
-        "MCP_MODE": "stdio",
-        "LOG_LEVEL": "error",
-        "DISABLE_CONSOLE_OUTPUT": "true",
-        "N8N_API_URL": "https://n8n-automations.danielcarreon.site",
-        "N8N_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3OGUyMGQ3Zi1kZTQxLTRjNzItODMzYS1hMGJlZDQ5NmExZTAiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzU3MTY1MTM4fQ.nuz6lkDPhXYbxdeV3crunrPXchM-b2y_EUOP6rFxqBs"
-      }
-    },
     "sequential-thinking": {
       "command": "npx",
       "args": [

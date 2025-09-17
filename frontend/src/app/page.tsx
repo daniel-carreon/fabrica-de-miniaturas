@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useImageStore } from '@/shared/stores/imageStore'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
+import { Download, Maximize2, Heart } from 'lucide-react'
 
 interface ApiResponse {
   images: Array<{
@@ -20,12 +21,15 @@ export default function HomePage() {
   const [prompt, setPrompt] = useState('')
   const [numImages, setNumImages] = useState(10)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [selectionMode, setSelectionMode] = useState(false)
   const {
     isGenerating,
     generatedImages,
     setGenerating,
     setGeneratedImages,
-    clearGenerated
+    clearGenerated,
+    toggleImageSelection,
+    getSelectedImages
   } = useImageStore()
 
   useEffect(() => {
@@ -42,6 +46,13 @@ export default function HomePage() {
     try {
       console.log('💾 Saving to favorites:', image.id)
 
+      // Show loading state
+      const originalButton = document.querySelector(`[title="Save to favorites"]`) as HTMLButtonElement
+      if (originalButton) {
+        originalButton.disabled = true
+        originalButton.style.opacity = '0.5'
+      }
+
       const response = await fetch('/api/favorites', {
         method: 'POST',
         headers: {
@@ -54,18 +65,118 @@ export default function HomePage() {
         }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to save favorite')
+        // More detailed error handling
+        let errorMessage = 'Failed to save favorite'
+
+        if (response.status === 400) {
+          errorMessage = 'Invalid image data'
+        } else if (response.status === 413) {
+          errorMessage = 'Image too large'
+        } else if (response.status === 500) {
+          errorMessage = data.details || 'Server error occurred'
+        } else {
+          errorMessage = data.error || `Error ${response.status}`
+        }
+
+        throw new Error(errorMessage)
       }
 
-      const data = await response.json()
       console.log('✅ Successfully saved to favorites:', data)
-      alert('✅ Image saved to favorites!')
+
+      // Success feedback with better UX
+      const notification = document.createElement('div')
+      notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in'
+      notification.textContent = '✅ Saved to favorites!'
+      document.body.appendChild(notification)
+
+      // Auto-remove notification
+      setTimeout(() => {
+        notification.remove()
+      }, 3000)
 
     } catch (error) {
       console.error('❌ Failed to save favorite:', error)
-      alert(`❌ Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`)
+
+      // Error feedback with better UX
+      const notification = document.createElement('div')
+      notification.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in'
+      notification.textContent = `❌ ${error instanceof Error ? error.message : 'Failed to save'}`
+      document.body.appendChild(notification)
+
+      // Auto-remove notification
+      setTimeout(() => {
+        notification.remove()
+      }, 5000)
+
+    } finally {
+      // Reset button state
+      const originalButton = document.querySelector(`[title="Save to favorites"]`) as HTMLButtonElement
+      if (originalButton) {
+        originalButton.disabled = false
+        originalButton.style.opacity = '1'
+      }
+    }
+  }
+
+  const handleDownloadImage = async (image: { id: string; url: string; prompt: string }) => {
+    try {
+      console.log('⬇️ Downloading image:', image.id)
+
+      // Fetch the image from the URL
+      const response = await fetch(image.url)
+      const blob = await response.blob()
+
+      // Create a download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+
+      // Create a filename based on the prompt (cleaned up)
+      const cleanPrompt = image.prompt.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50)
+      link.download = `dani_${cleanPrompt}_${image.id}.webp`
+
+      // Trigger download
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      // Clean up
+      window.URL.revokeObjectURL(url)
+
+      console.log('✅ Image downloaded successfully')
+    } catch (error) {
+      console.error('❌ Failed to download image:', error)
+      alert(`❌ Failed to download: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  const handleCombineSelected = async () => {
+    const selectedImages = getSelectedImages()
+
+    if (selectedImages.length !== 2) {
+      alert('Please select exactly 2 images to combine')
+      return
+    }
+
+    const prompt = window.prompt('How would you like to combine these images?', 'Combine these images into a professional thumbnail')
+    if (!prompt) return
+
+    try {
+      console.log('🔄 Requesting image combination via chat...')
+
+      // Send a message to the chat agent to combine the images
+      const chatMessage = `Combina estas dos imágenes: ${selectedImages[0].url} y ${selectedImages[1].url} con el siguiente prompt: ${prompt}`
+
+      // For now, we'll show this message - in a real implementation,
+      // this would integrate with the chat system
+      alert(`🔄 Combination request: ${chatMessage}`)
+
+    } catch (error) {
+      console.error('❌ Failed to request combination:', error)
+      alert(`❌ Failed to request combination: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -205,18 +316,61 @@ export default function HomePage() {
       {/* Results Grid */}
       {generatedImages.length > 0 && (
         <GlassCard variant="dark" className="purple-glow">
-          <h2 className="text-xl font-bold mb-6 text-white">
-            ✨ Generated Images ({generatedImages.length})
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white">
+              ✨ Generated Images ({generatedImages.length})
+            </h2>
+            <div className="flex gap-3">
+              {!selectionMode ? (
+                <LiquidButton
+                  onClick={() => setSelectionMode(true)}
+                  variant="space"
+                  size="sm"
+                >
+                  🔄 Combine Mode
+                </LiquidButton>
+              ) : (
+                <>
+                  <LiquidButton
+                    onClick={handleCombineSelected}
+                    variant="space"
+                    size="sm"
+                    disabled={getSelectedImages().length !== 2}
+                    className="disabled:opacity-50"
+                  >
+                    ✨ Combine ({getSelectedImages().length}/2)
+                  </LiquidButton>
+                  <LiquidButton
+                    onClick={() => setSelectionMode(false)}
+                    variant="space"
+                    size="sm"
+                  >
+                    ❌ Cancel
+                  </LiquidButton>
+                </>
+              )}
+            </div>
+          </div>
           <div className="image-grid">
             {generatedImages.map((image) => (
-              <div key={image.id} className="image-card group">
+              <div key={image.id} className={`image-card group relative ${image.isSelected ? 'ring-4 ring-purple-500' : ''}`}>
+                {selectionMode && (
+                  <div className="absolute top-2 left-2 z-10">
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+                      image.isSelected
+                        ? 'bg-purple-500 border-purple-500 text-white'
+                        : 'bg-black/50 border-white text-white'
+                    }`}>
+                      {image.isSelected ? '✓' : ''}
+                    </div>
+                  </div>
+                )}
                 <img
                   src={image.url}
                   alt={`Generated from: ${image.prompt}`}
                   className="w-full h-32 object-cover cursor-pointer hover:scale-105 transition-transform"
                   loading="lazy"
-                  onClick={() => setSelectedImage(image.url)}
+                  onClick={() => selectionMode ? toggleImageSelection(image.id) : null}
                   onError={(e) => {
                     console.error('❌ Image failed to load:')
                     console.error('  URL:', image.url)
@@ -228,16 +382,44 @@ export default function HomePage() {
                   }}
                   onLoad={() => console.log('✅ Image loaded successfully:', image.url)}
                 />
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all">
-                  <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <LiquidButton
-                      onClick={() => handleSaveFavorite(image)}
-                      variant="space"
-                      size="sm"
-                      className="w-full"
+                {/* Subtle hover icons */}
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <div className="flex gap-1">
+                    {/* Download */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDownloadImage(image)
+                      }}
+                      className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+                      title="Download image"
                     >
-                      ❤️ Save
-                    </LiquidButton>
+                      <Download className="w-4 h-4 text-white" />
+                    </button>
+
+                    {/* Maximize */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedImage(image.url)
+                      }}
+                      className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+                      title="View fullscreen"
+                    >
+                      <Maximize2 className="w-4 h-4 text-white" />
+                    </button>
+
+                    {/* Save favorite */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSaveFavorite(image)
+                      }}
+                      className="w-8 h-8 bg-black/70 hover:bg-purple-600/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+                      title="Save to favorites"
+                    >
+                      <Heart className="w-4 h-4 text-white" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -281,6 +463,24 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* CSS Styles */}
+      <style jsx global>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out;
+        }
+      `}</style>
     </div>
   )
 }

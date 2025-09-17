@@ -62,8 +62,8 @@ export default function ChatAgent() {
       console.log('✅ OpenRouter response:', data)
 
       // If tool was used and returned images, add them to gallery
-      if (data.tool_used === 'generate_images' && data.tool_result?.images) {
-        console.log('🎨 Processing generated images from chat tool:', data.tool_result)
+      if ((data.tool_used === 'generate_images' || data.tool_used === 'combine_images') && data.tool_result?.images) {
+        console.log(`🎨 Processing ${data.tool_used} images from chat tool:`, data.tool_result)
 
         // Transform tool_result images to imageStore format
         const transformedImages = data.tool_result.images.map((img: any) => ({

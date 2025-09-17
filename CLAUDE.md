@@ -651,4 +651,119 @@ claude-code --debug --mcp-verbose
 
 ---
 
+## 🎯 **ESTADO ACTUAL DEL PROYECTO (Diciembre 2024)**
+
+### ✅ **COMPLETADO - MVP FUNCIONANDO**
+1. **Chat Agent → Replicate Pipeline** ✅
+   - Tool calling funciona perfecto con OpenRouter + gpt-5-mini
+   - Detecta "una imagen" vs "varias imágenes" correctamente
+   - System prompt: TRIGGER WORD es "DANI" (crítico recordar)
+   - Backend Python FastAPI (puerto 8000) → Frontend React (puerto 3000)
+   - Las imágenes aparecen automáticamente en gallery después del chat
+
+2. **Resizer Handle** ✅ - Modal de imágenes ✅ - UX optimizado ✅
+
+3. **Configuración Crítica Documentada:**
+   - FRONTEND_URL = "http://localhost:3000" (NO 3005!)
+   - max_tokens = 1500 (crítico para tool arguments largos)
+   - Modelo actual: daniel-carreon/danielcarrong:56c9356f (190 runs exitosos)
+
+## 🚀 **ROADMAP PRÓXIMAS FASES - FÁBRICA DE MINIATURAS**
+
+### **FASE 1: AMPLIAR IMÁGENES + FLUX CONTEXT RESEARCH**
+- [ ] **Modal ampliar imágenes** - Click en imagen → modal fullscreen
+- [ ] **Investigar Flux Context vs Flux Dev** - ¿Mejor modelo disponible?
+- [ ] **Analizar LoRA reentrenamiento** - Evaluar si Context > Dev actual
+
+### **FASE 2: NANO BANANA INTEGRATION (Segunda herramienta del agente)**
+- [ ] **Investigar Gemini 2.5 Flash Image Preview** via OpenRouter
+- [ ] **Tool calling para "combinar imágenes"** - Segunda función del chat agent
+- [ ] **Sistema de almacenamiento:** ¿Supabase buckets vs URLs temporales Replicate?
+- [ ] **Flujo: Generar → Seleccionar → Combinar → Miniatura final**
+
+### **FASE 3: SISTEMA DE PERSISTENCIA INTELIGENTE**
+- [ ] **Supabase Storage buckets** para imágenes favoritas
+- [ ] **Metadata tracking:** prompt, modelo, parámetros, scores
+- [ ] **Sistema de favoritos** con storage permanente
+- [ ] **A/B testing framework** para miniaturas
+
+### **FASE 4: MULTI-TOOL AGENT (El agente completo)**
+Herramientas del chat agent:
+1. ✅ `generate_images` (Flux Dev + DANI LoRA)
+2. [ ] `combine_images` (Nano Banana + 2 imágenes input)
+3. [ ] `save_to_favorites` (Supabase storage)
+4. [ ] `create_thumbnail_variations` (batch processing)
+5. [ ] `analyze_thumbnail_performance` (futuro: metrics)
+
+## 📋 **INFORMACIÓN TÉCNICA CRÍTICA PARA CONTEXTO**
+
+### **N8N Template Analysis (Combinar Imágenes)**
+- Workflow existente: `backend/n8n_templates/Combinar Imagenes yt.json`
+- Flujo: Google Drive → IMGBB upload → fal.ai/nano-banana/edit API
+- Input: 2 image URLs + prompt → Output: combined image
+- Polling mechanism: 10 segundos wait → get result → download
+
+### **Flux Context Intelligence (ChatGPT Research)**
+```
+MODELO RECOMENDADO: black-forest-labs/flux-kontext-dev-lora
+- Mejor que Flux Dev para edición con referencia + LoRA
+- Inputs: input_image + prompt + lora_weights + lora_strength
+- Caso de uso: cargar miniatura base + reemplazar rostro con identidad entrenada
+- JSON ejemplo: guidance(2-3), num_inference_steps(30-50), lora_strength(0.8-1.2)
+```
+
+### **OpenRouter Nano Banana Access**
+```
+MODELO: google/gemini-2.5-flash-image-preview
+- Pricing: $0.30/M input + $2.50/M output + $1.238/K images
+- Capabilities: image generation + editing + multi-turn conversations
+- Input: text+image → Output: text+image
+- Context: 32,768 tokens
+```
+
+### **Tool Calling Architecture Plan**
+```python
+TOOLS = [
+  {
+    "name": "generate_images",     # ✅ IMPLEMENTADO
+    "description": "Generate images using DANI fine-tuned model"
+  },
+  {
+    "name": "combine_images",      # 🎯 SIGUIENTE FASE
+    "description": "Combine two existing images using Nano Banana",
+    "parameters": {
+      "image1_id": "string",       # ID de imagen en gallery
+      "image2_id": "string",       # ID de imagen en gallery
+      "prompt": "string",          # Instrucciones de combinación
+      "output_name": "string"      # Nombre para resultado
+    }
+  }
+]
+```
+
+### **Storage Strategy Decision Pending**
+```
+DILEMA: ¿Supabase buckets vs Replicate URLs?
+- Replicate: URLs temporales, no control, más simple
+- Supabase: Storage permanente, más complejo, control total
+
+RECOMENDACIÓN TÉCNICA: Híbrido
+- Generación inicial: usar URLs temporales Replicate
+- Favoritos/finales: guardar en Supabase buckets
+- Metadata: siempre en Supabase database
+```
+
+## 🔄 **AUTOCOMPACTO CONTEXT RECOVERY**
+
+**AL LLEGAR AL LÍMITE DE CONTEXTO:**
+1. Leer este roadmap completo
+2. Estado actual: MVP chat→replicate funcionando
+3. Siguiente tarea: Modal ampliar imágenes + investigar Flux Context
+4. Objetivo final: Fábrica de miniaturas con multi-tool agent
+5. Configuración crítica en sección "CONFIGURACIÓN DE PUERTOS"
+
+**TRIGGER WORD CRÍTICO:** "DANI" - nunca olvidar en system prompts
+
+---
+
 *Este archivo es la fuente de verdad para desarrollo en este proyecto. Todas las decisiones de código deben alinearse con estos principios.*

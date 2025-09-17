@@ -1,14 +1,17 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import ChatAgent from '@/features/chat/components/ChatAgent'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
+import { Heart } from 'lucide-react'
 
 interface AppLayoutProps {
   children: React.ReactNode
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
+  const router = useRouter()
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [chatWidth, setChatWidth] = useState(384) // 96 * 4 = 384px (w-96)
   const [isDragging, setIsDragging] = useState(false)
@@ -77,19 +80,32 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </p>
               </div>
 
-              {/* Chat Toggle Button */}
-              <LiquidButton
-                onClick={() => setIsChatOpen(!isChatOpen)}
-                variant="space"
-                size="lg"
-                className="flex items-center gap-2"
-              >
-                <span className="text-lg">🤖</span>
-                <span className="hidden sm:inline">
-                  {isChatOpen ? 'Hide' : 'Show'} AI Assistant
-                </span>
-                <span className="sm:hidden">AI</span>
-              </LiquidButton>
+              <div className="flex items-center gap-3">
+                {/* Favorites Button */}
+                <LiquidButton
+                  onClick={() => router.push('/favorites')}
+                  variant="space"
+                  size="lg"
+                  className="flex items-center gap-2"
+                >
+                  <Heart className="w-5 h-5" />
+                  <span className="hidden sm:inline">Favorites</span>
+                </LiquidButton>
+
+                {/* Chat Toggle Button */}
+                <LiquidButton
+                  onClick={() => setIsChatOpen(!isChatOpen)}
+                  variant="space"
+                  size="lg"
+                  className="flex items-center gap-2"
+                >
+                  <span className="text-lg">🤖</span>
+                  <span className="hidden sm:inline">
+                    {isChatOpen ? 'Hide' : 'Show'} AI Assistant
+                  </span>
+                  <span className="sm:hidden">AI</span>
+                </LiquidButton>
+              </div>
             </div>
           </div>
         </header>

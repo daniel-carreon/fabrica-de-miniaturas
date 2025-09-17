@@ -4,6 +4,7 @@ Migrated from Next.js for better AI scalability
 """
 import json
 import logging
+import time
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -34,7 +35,8 @@ OPENROUTER_API_KEY = "sk-or-v1-01dc2be5e9525c3de91f49ab4adb07c3f62db062d9d539913
 FRONTEND_URL = "http://localhost:3000"
 
 # Tool definition
-TOOLS = [{
+TOOLS = [
+{
     "type": "function",
     "function": {
         "name": "generate_images",
@@ -48,33 +50,58 @@ TOOLS = [{
             "required": ["prompt"]
         }
     }
+},
+{
+    "type": "function",
+    "function": {
+        "name": "combine_images",
+        "description": "Combine two existing images from the gallery using Nano Banana (Gemini 2.5 Flash)",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "image1_url": {"type": "string", "description": "URL of the first image to combine"},
+                "image2_url": {"type": "string", "description": "URL of the second image to combine"},
+                "prompt": {"type": "string", "description": "Instructions for how to combine the images"},
+                "output_name": {"type": "string", "description": "Name for the resulting combined image", "default": "combined_image"}
+            },
+            "required": ["image1_url", "image2_url", "prompt"]
+        }
+    }
 }]
 
 # System prompt - deterministic
-SYSTEM_PROMPT = """You are a deterministic image generation assistant. Your ONLY job is to call the generate_images tool when users request visuals.
+SYSTEM_PROMPT = """You are a deterministic multi-tool image assistant. You have TWO tools available:
 
-MANDATORY BEHAVIOR:
-- When you see ANY visual keywords (generate, crear, make, imagen, image, thumbnail, photo, visual, DANI), you MUST call generate_images tool
-- NO conversation, NO questions - JUST call the tool immediately
+1. generate_images: Generate new images using DANI fine-tuned model
+2. combine_images: Combine two existing images using Nano Banana
 
-NUMBER OF IMAGES RULES:
-- If user says "una imagen" or "1 imagen" → numImages: 1
-- If user says "dos imagenes" or "2 imagenes" → numImages: 2
-- If user says "tres imagenes" or "3 imagenes" → numImages: 3
-- If user says "imagenes" (plural) without number → numImages: 3
-- If user doesn't specify → numImages: 3
+MANDATORY BEHAVIOR - ALWAYS CALL THE APPROPRIATE TOOL:
 
-SPANISH KEYWORDS TRIGGER:
+🎨 GENERATION KEYWORDS → generate_images tool:
 - "genera", "generame", "crea", "haz", "hace"
 - "imagen", "imagenes", "foto", "fotos"
 - "DANI" (trigger obligatorio)
 
-RULE: IF (visual keywords detected) THEN call_generate_images_tool()
+🔄 COMBINATION KEYWORDS → combine_images tool:
+- "combina", "mezcla", "fusiona", "une"
+- "dos imagenes", "2 imagenes", "primera y segunda"
+- "thumbnail", "miniatura final"
+
+NUMBER OF IMAGES RULES (for generate_images):
+- "una imagen" or "1 imagen" → numImages: 1
+- "dos imagenes" or "2 imagenes" → numImages: 2
+- "tres imagenes" or "3 imagenes" → numImages: 3
+- "imagenes" (plural) without number → numImages: 3
+- If not specified → numImages: 3
+
+COMBINATION RULES (for combine_images):
+- User must provide 2 image URLs or reference images from gallery
+- Always ask for combination prompt (how to merge them)
+- Use descriptive output_name
 
 EXAMPLES:
-"genera una imagen de DANI" → CALL generate_images with numImages: 1
-"generame imagenes de DANI" → CALL generate_images with numImages: 3
-"haz 2 fotos de DANI" → CALL generate_images with numImages: 2
+"genera 3 imagenes de DANI tech reviewer" → CALL generate_images
+"combina la primera y segunda imagen para hacer thumbnail" → CALL combine_images
 
 Temperature=0. Be 100% consistent."""
 
@@ -135,6 +162,100 @@ async def call_generate_api(prompt: str, num_images: int = 3) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"💥 Exception calling generate API: {str(e)}")
+        logger.error(f"💥 Exception type: {type(e)}")
+        raise
+
+async def call_combine_images_api(image1_url: str, image2_url: str, prompt: str, output_name: str = "combined_image") -> Dict[str, Any]:
+    """Combine two images using Gemini 2.5 Flash (Nano Banana) via OpenRouter"""
+    logger.info(f"🔄 Combining images with Nano Banana: '{prompt[:100]}...'")
+
+    try:
+        import base64
+        import io
+
+        # Download both images first
+        async with httpx.AsyncClient() as client:
+            logger.info(f"📥 Downloading image 1: {image1_url[:100]}...")
+            img1_response = await client.get(image1_url, timeout=30.0)
+            img1_response.raise_for_status()
+
+            logger.info(f"📥 Downloading image 2: {image2_url[:100]}...")
+            img2_response = await client.get(image2_url, timeout=30.0)
+            img2_response.raise_for_status()
+
+            # Convert to base64
+            img1_b64 = base64.b64encode(img1_response.content).decode('utf-8')
+            img2_b64 = base64.b64encode(img2_response.content).decode('utf-8')
+
+            # Call OpenRouter with Gemini 2.5 Flash Image
+            combine_payload = {
+                "model": "google/gemini-2.5-flash-image-preview",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": f"Combine these two images as follows: {prompt}"},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img1_b64}"}},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img2_b64}"}}
+                        ]
+                    }
+                ],
+                "modalities": ["image", "text"],
+                "max_tokens": 1500
+            }
+
+            logger.info(f"🚀 Calling Nano Banana for image combination...")
+
+            nano_response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': FRONTEND_URL,
+                    'X-Title': 'Daniel Flux Context - Nano Banana'
+                },
+                json=combine_payload,
+                timeout=120.0
+            )
+
+            logger.info(f"📥 Nano Banana response status: {nano_response.status_code}")
+
+            if nano_response.status_code != 200:
+                logger.error(f"❌ Nano Banana failed: {nano_response.status_code}")
+                logger.error(f"❌ Response: {nano_response.text}")
+                nano_response.raise_for_status()
+
+            result = nano_response.json()
+            logger.info(f"✅ Nano Banana success!")
+
+            # Extract the combined image from response
+            if result.get("choices") and len(result["choices"]) > 0:
+                message = result["choices"][0].get("message", {})
+
+                # Check if there are images in the response
+                if message.get("images"):
+                    combined_image_data = message["images"][0]
+                    combined_url = combined_image_data.get("image_url", {}).get("url")
+
+                    return {
+                        "images": [{
+                            "id": f"combined_{int(time.time())}",
+                            "url": combined_url,
+                            "prompt": f"Combined: {prompt}",
+                            "timestamp": int(time.time() * 1000),
+                            "output_name": output_name
+                        }],
+                        "total": 1,
+                        "prompt": prompt,
+                        "tool": "nano_banana"
+                    }
+                else:
+                    raise ValueError("No combined image returned from Nano Banana")
+            else:
+                raise ValueError("Invalid response format from Nano Banana")
+
+    except Exception as e:
+        logger.error(f"💥 Exception combining images: {str(e)}")
         logger.error(f"💥 Exception type: {type(e)}")
         raise
 
@@ -210,6 +331,39 @@ async def chat_endpoint(request: ChatRequest):
                     )
                 except Exception as e:
                     return ChatResponse(response=f"❌ Error generating images: {str(e)}")
+
+            elif tool_call["function"]["name"] == "combine_images":
+                try:
+                    # Parse tool arguments
+                    raw_args = tool_call["function"]["arguments"]
+                    logger.info(f"🔍 Raw combine tool arguments: {raw_args}")
+
+                    try:
+                        args = json.loads(raw_args)
+                        logger.info(f"✅ Successfully parsed combine args: {args}")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"⚠️ Combine JSON parsing failed: {e}")
+                        logger.info(f"🔧 Attempting fallback extraction...")
+                        args = extract_prompt_fallback(raw_args)
+                        logger.info(f"✅ Combine fallback extraction successful: {args}")
+
+                    # Combine images using Nano Banana
+                    result = await call_combine_images_api(
+                        args["image1_url"],
+                        args["image2_url"],
+                        args["prompt"],
+                        args.get("output_name", "combined_image")
+                    )
+
+                    return ChatResponse(
+                        response=f"🔄 Combined images successfully! '{args['prompt'][:100]}...' Check the gallery! ✨",
+                        tool_used="combine_images",
+                        tool_result=result,
+                        usage=data.get("usage"),
+                        model=data.get("model")
+                    )
+                except Exception as e:
+                    return ChatResponse(response=f"❌ Error combining images: {str(e)}")
 
         # No tool call - return text response
         return ChatResponse(
