@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useChatStore } from '../stores/chatStore'
 import { useImageStore } from '@/shared/stores/imageStore'
+import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
 
@@ -24,6 +25,7 @@ export default function ChatAgent() {
   } = useChatStore()
 
   const { setGeneratedImages } = useImageStore()
+  const { selectedImages, clearSelection } = useSelectedImages()
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -42,14 +44,15 @@ export default function ChatAgent() {
     try {
       console.log('🤖 Sending message to OpenRouter:', userMessage.content)
 
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const response = await fetch('http://localhost:8001/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           message: userMessage.content,
-          messages: messages // Context history
+          messages: messages, // Context history
+          selectedImages: selectedImages // Include selected images for combination tool
         }),
       })
 
@@ -76,6 +79,12 @@ export default function ChatAgent() {
 
         setGeneratedImages(transformedImages)
         console.log('✅ Images added to gallery:', transformedImages)
+
+        // Clear selection after successful combination
+        if (data.tool_used === 'combine_images') {
+          clearSelection()
+          console.log('🔗 Selected images cleared after successful combination')
+        }
 
         // Auto-save generated images to database
         if (data.tool_used === 'generate_images') {
@@ -213,6 +222,32 @@ export default function ChatAgent() {
       {/* Input */}
       <GlassCard variant="dark" className="purple-glow">
         <div className="space-y-3">
+          {/* Selected Images Indicator */}
+          {selectedImages.length > 0 && (
+            <div className="bg-purple-600/30 border border-purple-500/50 rounded-lg p-3 backdrop-blur-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-purple-200 text-sm">🔗 Selected: {selectedImages.length}/2 images</span>
+                  <div className="flex gap-1">
+                    {selectedImages.map((img, idx) => (
+                      <div key={img.id} className="w-8 h-8 rounded border border-purple-400 overflow-hidden">
+                        <img src={img.url} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={clearSelection}
+                  className="text-purple-300 hover:text-white text-xs bg-purple-600/50 hover:bg-purple-600 px-2 py-1 rounded transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+              <p className="text-purple-300 text-xs mt-2">
+                Ask me to combine these images with instructions like "combina estas dos imágenes..."
+              </p>
+            </div>
+          )}
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}

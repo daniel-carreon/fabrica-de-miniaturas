@@ -753,16 +753,150 @@ RECOMENDACIÓN TÉCNICA: Híbrido
 - Metadata: siempre en Supabase database
 ```
 
+## 📊 **ARQUITECTURA DE DATOS - CIENTÍFICO DE DATOS**
+
+### **Estructura Actual de Base de Datos (Diciembre 2024)**
+
+#### **Tablas Implementadas:**
+```sql
+-- 1. GENERATED_IMAGES: Registro completo de generaciones IA (43 registros)
+CREATE TABLE generated_images (
+    id UUID PRIMARY KEY,
+    image_id TEXT UNIQUE,                    -- ID único de Replicate
+    replicate_url TEXT NOT NULL,            -- URL temporal de Replicate
+    prompt TEXT NOT NULL,                   -- Prompt original
+    model_version TEXT,                     -- daniel-carreon/danielcarrong:56c9356f
+    model_parameters JSONB DEFAULT '{}',    -- Parámetros de generación
+    generation_session TEXT,                -- Sesión de batch
+    generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    tags TEXT[] DEFAULT '{}',               -- Tags para categorización
+    quality_score DOUBLE PRECISION,        -- Score de calidad (futuro ML)
+    is_combined BOOLEAN DEFAULT FALSE,     -- Si es resultado de combinación
+    parent_images TEXT[]                    -- URLs de imágenes padre
+);
+
+-- 2. USER_UPLOADS: Archivos subidos por usuarios (1 registro)
+CREATE TABLE user_uploads (
+    id UUID PRIMARY KEY,
+    filename TEXT NOT NULL,
+    storage_path TEXT NOT NULL,             -- Path en Supabase Storage
+    public_url TEXT NOT NULL,               -- URL pública CDN
+    file_size BIGINT CHECK (file_size <= 52428800), -- 50MB max
+    mime_type TEXT CHECK (mime_type LIKE 'image/%'),
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    original_dimensions JSONB DEFAULT '{}',
+    tags TEXT[] DEFAULT '{}',
+    description TEXT,
+    user_id UUID                           -- FK futuro auth
+);
+
+-- 3. FAVORITE_IMAGES: Colección curada (2 registros)
+CREATE TABLE favorite_images (
+    id UUID PRIMARY KEY,
+    image_id TEXT NOT NULL,
+    original_url TEXT NOT NULL,            -- URL original
+    supabase_url TEXT,                     -- URL backup en storage
+    prompt TEXT NOT NULL,
+    saved_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+#### **Principios de Diseño de Datos (Científico):**
+1. **Trazabilidad Completa**: Metadata para análisis futuro
+2. **Preparado para ML**: quality_score, tags, parent_images para modelos
+3. **Escalabilidad**: UUIDs, JSONB para flexibilidad
+4. **Performance**: Indexes en campos de búsqueda frecuente
+5. **Analytics Ready**: Estructura para A/B testing y metrics
+
+## 🤖 **ROADMAP: COMBINE_IMAGES TOOL CONVERSACIONAL**
+
+### **❌ PROBLEMA IDENTIFICADO:**
+- Tool `combine_images` definida en backend pero NO implementada
+- Implementé botón manual "Combine Mode" (INCORRECTO)
+- Workflow NO es conversacional como debe ser
+
+### **✅ OBJETIVO CORRECTO:**
+```
+Usuario: "Combina la imagen de DANI sonriendo con la de DANI serio"
+AI Agent: [busca automáticamente] → [encuentra] → [combina] → [resultado]
+```
+
+### **IMPLEMENTACIÓN PENDIENTE:**
+
+#### **1. Backend: combine_images_tool()**
+```python
+# backend/api/chat_router.py
+async def combine_images_tool(image1_url: str, image2_url: str, prompt: str):
+    # 1. Llamar Gemini 2.5 Flash Image Preview via OpenRouter
+    # 2. Procesar combinación con Nano Banana
+    # 3. Guardar en generated_images (is_combined=True, parent_images=[url1,url2])
+    # 4. Retornar URL resultado
+```
+
+#### **2. Sistema Búsqueda Inteligente**
+```python
+async def find_images_by_description(description: str):
+    # Buscar en generated_images, user_uploads, favorite_images
+    # Similarity search en prompts/descriptions
+    # Retornar mejores matches con URLs
+```
+
+#### **3. Integration Gemini 2.5 Flash**
+- Modelo: `google/gemini-2.5-flash-image-preview`
+- Input: 2 image URLs + combination prompt
+- Pricing: $0.30/M input + $2.50/M output + $1.238/K images
+- Referencia: `backend/n8n_templates/Combinar Imagenes yt.json`
+
+#### **4. Remover Botón Manual**
+- Eliminar "Combine Mode" del frontend
+- Solo workflow conversacional natural
+
 ## 🔄 **AUTOCOMPACTO CONTEXT RECOVERY**
 
 **AL LLEGAR AL LÍMITE DE CONTEXTO:**
 1. Leer este roadmap completo
-2. Estado actual: MVP chat→replicate funcionando
-3. Siguiente tarea: Modal ampliar imágenes + investigar Flux Context
-4. Objetivo final: Fábrica de miniaturas con multi-tool agent
+2. **Estado actual**: Dashboard unificado funcionando (3 paneles toggle)
+3. **Siguiente tarea**: Implementar combine_images tool conversacional (eliminar botón manual)
+4. **Objetivo final**: Fábrica de miniaturas con multi-tool agent 100% conversacional
 5. Configuración crítica en sección "CONFIGURACIÓN DE PUERTOS"
 
 **TRIGGER WORD CRÍTICO:** "DANI" - nunca olvidar en system prompts
+
+### **Información Crítica Contextual (Diciembre 2024):**
+- ✅ **Dashboard Unificado**: 3 paneles toggle funcionando (Generated 43, Favorites 2, Uploads 1)
+- ✅ **Generate Images Tool**: Funcionando perfectamente via chat agent
+- ❌ **Combine Images Tool**: Definida pero NO implementada (PRIORIDAD MÁXIMA)
+- ✅ **Base de Datos**: 3 tablas optimizadas para analytics y ML futuro
+- ✅ **Storage Híbrido**: Replicate URLs + Supabase Storage funcionando
+- ❌ **Botón Combine Mode**: DEBE ELIMINARSE - solo workflow conversacional
+- ✅ **RLS Policies**: Storage configurado correctamente
+- ✅ **Auto-save**: Todas las generaciones se guardan automáticamente
+
+---
+
+## 🚀 **INFORMACIÓN PARA PRÓXIMA SESIÓN**
+
+### **Estado del Dashboard (100% Funcional):**
+- ✅ Header simplificado con solo botón AI Assistant circular
+- ✅ Panel controls responsive sin overflow de texto
+- ✅ 3 paneles toggle: Generated (42), Favorites (1), Uploads (1)
+- ✅ Auto-carga de datos desde las 3 fuentes
+- ✅ Upload drag & drop funcionando
+- ✅ Save to favorites funcionando
+
+### **Próxima Tarea CRÍTICA:**
+1. **Eliminar botón "Combine Mode"** del frontend
+2. **Implementar combine_images tool** en backend
+3. **Integrar Gemini 2.5 Flash Image Preview**
+4. **Sistema de búsqueda automática** de imágenes
+5. **Workflow 100% conversacional**
+
+### **Configuración Actual:**
+- Frontend: localhost:3000
+- Backend: localhost:8000
+- Modelo: daniel-carreon/danielcarrong:56c9356f
+- Storage: Supabase buckets + Replicate URLs
+- Tools: generate_images (✅), combine_images (❌)
 
 ---
 
