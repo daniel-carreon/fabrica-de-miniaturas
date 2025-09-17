@@ -76,6 +76,40 @@ export default function ChatAgent() {
 
         setGeneratedImages(transformedImages)
         console.log('✅ Images added to gallery:', transformedImages)
+
+        // Auto-save generated images to database
+        if (data.tool_used === 'generate_images') {
+          try {
+            console.log('💾 Auto-saving generated images to database...')
+
+            const autoSaveResponse = await fetch('/api/generated', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                images: data.tool_result.images,
+                modelVersion: 'daniel-carreon/danielcarrong:56c9356f',
+                modelParameters: {
+                  tool_used: data.tool_used,
+                  prompt: data.tool_result.prompt,
+                  total: data.tool_result.total
+                },
+                generationSession: `chat_${Date.now()}`
+              })
+            })
+
+            if (autoSaveResponse.ok) {
+              const autoSaveData = await autoSaveResponse.json()
+              console.log('✅ Images auto-saved to database:', autoSaveData.data.saved)
+            } else {
+              console.warn('⚠️ Auto-save failed but continuing with UI update')
+            }
+          } catch (autoSaveError) {
+            console.error('❌ Auto-save error:', autoSaveError)
+            // Don't block UI if auto-save fails
+          }
+        }
       }
 
       const assistantMessage: ChatMessage = {

@@ -4,7 +4,7 @@ import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ChatAgent from '@/features/chat/components/ChatAgent'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
-import { Heart } from 'lucide-react'
+import { Heart, FolderOpen } from 'lucide-react'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -81,6 +81,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </div>
 
               <div className="flex items-center gap-3">
+                {/* Media Button */}
+                <LiquidButton
+                  onClick={() => router.push('/media')}
+                  variant="space"
+                  size="lg"
+                  className="flex items-center gap-2"
+                >
+                  <FolderOpen className="w-5 h-5" />
+                  <span className="hidden sm:inline">Media</span>
+                </LiquidButton>
+
                 {/* Favorites Button */}
                 <LiquidButton
                   onClick={() => router.push('/favorites')}
