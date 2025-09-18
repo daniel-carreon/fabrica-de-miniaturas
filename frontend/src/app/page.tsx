@@ -594,8 +594,15 @@ export default function HomePage() {
                   const imageToSave = generatedImages.find(img => img.id === id)
                   if (imageToSave) handleSaveFavorite(imageToSave)
                 }}
-                onDelete={(id) => {
-                  setGeneratedImages(prev => prev.filter(img => img.id !== id))
+                onDelete={async (id) => {
+                  try {
+                    const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
+                    if (response.ok) {
+                      setGeneratedImages(prev => prev.filter(img => img.id !== id))
+                    }
+                  } catch (error) {
+                    console.error('Error deleting generated image:', error)
+                  }
                 }}
               />
             ))}
@@ -625,8 +632,15 @@ export default function HomePage() {
                   }
                   await handleSaveFavorite(imageToSave)
                 }}
-                onDelete={(id) => {
-                  setGeneratedHistory(prev => prev.filter(img => img.id !== id))
+                onDelete={async (id) => {
+                  try {
+                    const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
+                    if (response.ok) {
+                      setGeneratedHistory(prev => prev.filter(img => img.id !== id))
+                    }
+                  } catch (error) {
+                    console.error('Error deleting generated history image:', error)
+                  }
                 }}
               />
             ))}
@@ -668,9 +682,16 @@ export default function HomePage() {
                     savedAt: new Date(favorite.saved_at).toLocaleDateString(),
                     originalModel: favorite.model_version || 'Unknown'
                   }}
-                  onDelete={(id) => {
+                  onDelete={async (id) => {
                     if (confirm('¿Remover de favoritos?')) {
-                      setFavorites(prev => prev.filter(fav => fav.id !== id))
+                      try {
+                        const response = await fetch(`/api/favorites/${id}`, { method: 'DELETE' })
+                        if (response.ok) {
+                          setFavorites(prev => prev.filter(fav => fav.id !== id))
+                        }
+                      } catch (error) {
+                        console.error('Error deleting favorite:', error)
+                      }
                     }
                   }}
                 />

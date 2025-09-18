@@ -235,28 +235,47 @@ async def call_combine_images_api(image1_url: str, image2_url: str, prompt: str,
             logger.info(f"✅ Nano Banana success!")
 
             # Extract the combined image from response
+            logger.info(f"🔍 Debug - Full Nano Banana response: {result}")
+
             if result.get("choices") and len(result["choices"]) > 0:
                 message = result["choices"][0].get("message", {})
+                logger.info(f"🔍 Debug - Message content: {message}")
 
                 # Check if there are images in the response
                 if message.get("images"):
+                    logger.info(f"🔍 Debug - Found images in message.images")
                     combined_image_data = message["images"][0]
                     combined_url = combined_image_data.get("image_url", {}).get("url")
-
-                    return {
-                        "images": [{
-                            "id": f"combined_{int(time.time())}",
-                            "url": combined_url,
-                            "prompt": f"Combined: {prompt}",
-                            "timestamp": int(time.time() * 1000),
-                            "output_name": output_name
-                        }],
-                        "total": 1,
-                        "prompt": prompt,
-                        "tool": "nano_banana"
-                    }
+                elif message.get("content"):
+                    logger.info(f"🔍 Debug - Checking message.content for images: {message['content']}")
+                    # Gemini might return images in content array
+                    content = message["content"]
+                    if isinstance(content, list):
+                        for item in content:
+                            if item.get("type") == "image":
+                                logger.info(f"🔍 Debug - Found image in content array")
+                                combined_url = item.get("source", {}).get("url") or item.get("image_url", {}).get("url")
+                                break
+                        else:
+                            raise ValueError("No image found in content array")
+                    else:
+                        raise ValueError("Content is not array format")
                 else:
-                    raise ValueError("No combined image returned from Nano Banana")
+                    logger.error(f"🔍 Debug - No images found. Message keys: {list(message.keys())}")
+                    raise ValueError("No images found in response")
+
+                return {
+                    "images": [{
+                        "id": f"combined_{int(time.time())}",
+                        "url": combined_url,
+                        "prompt": f"Combined: {prompt}",
+                        "timestamp": int(time.time() * 1000),
+                        "output_name": output_name
+                    }],
+                    "total": 1,
+                    "prompt": prompt,
+                    "tool": "nano_banana"
+                }
             else:
                 raise ValueError("Invalid response format from Nano Banana")
 

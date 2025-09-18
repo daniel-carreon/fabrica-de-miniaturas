@@ -44,7 +44,7 @@ export default function ChatAgent() {
     try {
       console.log('🤖 Sending message to OpenRouter:', userMessage.content)
 
-      const response = await fetch('http://localhost:8001/api/chat', {
+      const response = await fetch('http://localhost:8000/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,7 +87,7 @@ export default function ChatAgent() {
         }
 
         // Auto-save generated images to database
-        if (data.tool_used === 'generate_images') {
+        if (data.tool_used === 'generate_images' || data.tool_used === 'combine_images') {
           try {
             console.log('💾 Auto-saving generated images to database...')
 
