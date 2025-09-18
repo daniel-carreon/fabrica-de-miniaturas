@@ -6,6 +6,8 @@ import { useImageStore } from '@/shared/stores/imageStore'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
+import PromptsPanel from '@/components/ui/PromptsPanel'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 
 interface ChatMessage {
   id: string
@@ -16,6 +18,7 @@ interface ChatMessage {
 
 export default function ChatAgent() {
   const [input, setInput] = useState('')
+  const [showPrompts, setShowPrompts] = useState(false)
   const {
     messages,
     isLoading,
@@ -25,7 +28,15 @@ export default function ChatAgent() {
   } = useChatStore()
 
   const { setGeneratedImages } = useImageStore()
-  const { selectedImages, clearSelection } = useSelectedImages()
+  const { selectedImages, clearSelection, handleImageSelect } = useSelectedImages()
+
+  const handleInjectPrompt = (prompt: string) => {
+    setInput(prev => {
+      const newInput = prev.trim() ? `${prev}\n\n${prompt}` : prompt
+      return newInput
+    })
+    setShowPrompts(false) // Collapse panel after injection
+  }
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -68,13 +79,14 @@ export default function ChatAgent() {
       if ((data.tool_used === 'generate_images' || data.tool_used === 'combine_images') && data.tool_result?.images) {
         console.log(`🎨 Processing ${data.tool_used} images from chat tool:`, data.tool_result)
 
-        // Transform tool_result images to imageStore format
+        // Transform tool_result images to imageStore format with source marking
         const transformedImages = data.tool_result.images.map((img: any) => ({
           id: img.id,
           url: img.url,
           prompt: img.prompt,
           isSelected: false,
-          createdAt: new Date(img.timestamp)
+          createdAt: new Date(img.timestamp),
+          source: data.tool_used === 'generate_images' ? 'flux_dani' : 'nano_banana'
         }))
 
         setGeneratedImages(transformedImages)
@@ -104,7 +116,8 @@ export default function ChatAgent() {
                   prompt: data.tool_result.prompt,
                   total: data.tool_result.total
                 },
-                generationSession: `chat_${Date.now()}`
+                generationSession: `chat_${Date.now()}`,
+                toolUsed: data.tool_used // Pass tool_used for correct categorization
               })
             })
 
@@ -219,33 +232,34 @@ export default function ChatAgent() {
         )}
       </div>
 
+
       {/* Input */}
       <GlassCard variant="dark" className="purple-glow">
         <div className="space-y-3">
-          {/* Selected Images Indicator */}
+          {/* Selected Images - Minimalist */}
           {selectedImages.length > 0 && (
-            <div className="bg-purple-600/30 border border-purple-500/50 rounded-lg p-3 backdrop-blur-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-purple-200 text-sm">🔗 Selected: {selectedImages.length}/2 images</span>
-                  <div className="flex gap-1">
-                    {selectedImages.map((img, idx) => (
-                      <div key={img.id} className="w-8 h-8 rounded border border-purple-400 overflow-hidden">
+            <div className="bg-purple-600/20 border border-purple-500/30 rounded-lg p-2 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-purple-200 text-xs">{selectedImages.length}/8</span>
+                <div className="flex gap-1">
+                  {selectedImages.map((img) => (
+                    <div key={img.id} className="relative group">
+                      <div className="w-8 h-8 rounded border border-purple-400/50 overflow-hidden">
                         <img src={img.url} alt="" className="w-full h-full object-cover" />
                       </div>
-                    ))}
-                  </div>
+                      <button
+                        onClick={() => {
+                          // Use the context function to deselect
+                          handleImageSelect(img.id, img.url, img.source)
+                        }}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <button
-                  onClick={clearSelection}
-                  className="text-purple-300 hover:text-white text-xs bg-purple-600/50 hover:bg-purple-600 px-2 py-1 rounded transition-colors"
-                >
-                  Clear
-                </button>
               </div>
-              <p className="text-purple-300 text-xs mt-2">
-                Ask me to combine these images with instructions like "combina estas dos imágenes..."
-              </p>
             </div>
           )}
           <textarea

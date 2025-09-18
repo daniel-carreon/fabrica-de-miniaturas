@@ -1,0 +1,50 @@
+[
+  {
+    "name": "DANI Thumbnail Professional",
+    "prompt": "DANI professional headshot, confident expression, modern studio lighting, clean background, high quality portrait for YouTube thumbnail, sharp focus, professional attire",
+    "category": "thumbnail",
+    "tags": ["professional", "headshot", "youtube", "clean"]
+  },
+  {
+    "name": "DANI Excited Reaction",
+    "prompt": "DANI excited surprised expression, wide eyes, pointing gesture, dynamic pose, bright colorful background, perfect for reaction thumbnail, energetic mood",
+    "category": "thumbnail",
+    "tags": ["excited", "reaction", "dynamic", "colorful"]
+  },
+  {
+    "name": "DANI Tech Review Setup",
+    "prompt": "DANI holding modern tech device, clean tech workspace background, professional lighting, focused expression, tech review thumbnail style, minimalist aesthetic",
+    "category": "thumbnail",
+    "tags": ["tech", "review", "modern", "minimalist"]
+  },
+  {
+    "name": "DANI vs Comparison",
+    "prompt": "DANI thoughtful expression, split screen comparison background, decision-making pose, neutral lighting, perfect for vs comparison thumbnails",
+    "category": "thumbnail",
+    "tags": ["comparison", "vs", "decision", "split"]
+  },
+  {
+    "name": "DANI Tutorial Teacher",
+    "prompt": "DANI explaining gesture, pointing forward, confident teacher expression, educational background, clear lighting, tutorial thumbnail style",
+    "category": "thumbnail",
+    "tags": ["tutorial", "teaching", "educational", "pointing"]
+  },
+  {
+    "name": "DANI Success Celebration",
+    "prompt": "DANI celebrating success, arms raised, big smile, victory pose, bright positive background, achievement thumbnail mood, inspirational",
+    "category": "thumbnail",
+    "tags": ["success", "celebration", "victory", "positive"]
+  },
+  {
+    "name": "DANI Shocked Discovery",
+    "prompt": "DANI shocked expression, mouth open, wide eyes, dramatic lighting, dark mysterious background, perfect for revealing secrets thumbnail",
+    "category": "thumbnail",
+    "tags": ["shocked", "discovery", "dramatic", "mysterious"]
+  },
+  {
+    "name": "DANI Business Portrait",
+    "prompt": "DANI in business attire, professional corporate background, serious confident expression, executive lighting, business content thumbnail",
+    "category": "thumbnail",
+    "tags": ["business", "corporate", "executive", "professional"]
+  }
+]

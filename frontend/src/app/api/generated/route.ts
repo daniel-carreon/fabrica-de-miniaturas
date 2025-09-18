@@ -16,11 +16,12 @@ interface SaveGeneratedRequest {
   modelVersion?: string
   modelParameters?: object
   generationSession?: string
+  toolUsed?: 'generate_images' | 'combine_images'
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { images, modelVersion, modelParameters, generationSession }: SaveGeneratedRequest = await request.json()
+    const { images, modelVersion, modelParameters, generationSession, toolUsed }: SaveGeneratedRequest = await request.json()
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json(
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
       generated_at: new Date(image.timestamp).toISOString(),
       tags: [], // Default empty tags
       quality_score: null, // To be computed later
-      is_combined: false, // Default for generated images
+      is_combined: toolUsed === 'combine_images', // Mark combined images correctly
       parent_images: [] // Empty for original generations
     }))
 

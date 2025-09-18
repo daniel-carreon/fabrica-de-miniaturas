@@ -13,6 +13,7 @@ interface ImageCardProps {
   onDelete?: (id: string) => void
   onToggleFavorite?: (id: string) => void
   isFavorite?: boolean
+  disabled?: boolean
 }
 
 export default function ImageCard({
@@ -23,15 +24,20 @@ export default function ImageCard({
   metadata,
   onDelete,
   onToggleFavorite,
-  isFavorite = false
+  isFavorite = false,
+  disabled = false
 }: ImageCardProps) {
-  const { handleImageSelect, isImageSelected } = useSelectedImages()
+  const { handleImageSelect, isImageSelected, isImageDisabled } = useSelectedImages()
   const [showModal, setShowModal] = useState(false)
   const [showControls, setShowControls] = useState(false)
+  const [imageError, setImageError] = useState(false)
+  const [imageLoading, setImageLoading] = useState(true)
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.preventDefault()
-    handleImageSelect(id, url, source)
+    if (!isImageDisabled(id)) {
+      handleImageSelect(id, url, source)
+    }
   }
 
   const handleExpandClick = (e: React.MouseEvent) => {
@@ -53,6 +59,16 @@ export default function ImageCard({
     }
   }
 
+  const handleImageLoad = () => {
+    setImageLoading(false)
+    setImageError(false)
+  }
+
+  const handleImageError = () => {
+    setImageLoading(false)
+    setImageError(true)
+  }
+
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation()
     const link = document.createElement('a')
@@ -66,23 +82,49 @@ export default function ImageCard({
       {/* Main Card */}
       <div
         className={`
-          image-card group relative cursor-pointer transition-all duration-300 rounded-lg overflow-hidden
+          image-card group relative transition-all duration-300 rounded-lg overflow-hidden
+          ${isImageDisabled(id)
+            ? 'opacity-50 cursor-not-allowed'
+            : 'cursor-pointer'
+          }
           ${isImageSelected(id)
             ? 'ring-4 ring-purple-500 ring-opacity-80 shadow-lg shadow-purple-500/30'
+            : isImageDisabled(id)
+            ? ''
             : 'hover:ring-2 hover:ring-purple-300 hover:shadow-lg'
           }
         `}
         onClick={handleCardClick}
-        onMouseEnter={() => setShowControls(true)}
+        onMouseEnter={() => !isImageDisabled(id) && setShowControls(true)}
         onMouseLeave={() => setShowControls(false)}
       >
-        {/* Image */}
-        <img
-          src={url}
-          alt={prompt || `Image from ${source}`}
-          className="w-full h-32 object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
-        />
+        {/* Image with Error Handling */}
+        {imageError ? (
+          /* Error Placeholder */
+          <div className="w-full h-32 bg-gray-800 flex flex-col items-center justify-center text-gray-400">
+            <div className="text-2xl mb-2">🖼️</div>
+            <div className="text-xs text-center px-2">
+              <p className="font-medium">Imagen no disponible</p>
+              <p className="text-gray-500">URL expirado</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Loading Skeleton */}
+            {imageLoading && (
+              <div className="absolute inset-0 w-full h-32 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 animate-pulse" />
+            )}
+            {/* Actual Image */}
+            <img
+              src={url}
+              alt={prompt || `Image from ${source}`}
+              className="w-full h-32 object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+            />
+          </>
+        )}
 
         {/* Selection Checkbox - Always visible */}
         <div className="absolute top-2 left-2 z-10">
@@ -150,19 +192,22 @@ export default function ImageCard({
 
       {/* Modal for expanded view */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
-          <div className="max-w-4xl max-h-full bg-black/90 rounded-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="relative">
-              <img src={url} alt={prompt || `Image from ${source}`} className="max-w-full max-h-[80vh] object-contain" />
-              <button
-                onClick={() => setShowModal(false)}
-                className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white w-10 h-10 rounded-full flex items-center justify-center"
-              >
-                ✕
-              </button>
-            </div>
-            {/* Metadata */}
-            <div className="p-6 border-t border-gray-700">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+          <div className="relative w-screen h-screen flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={url}
+              alt={prompt || `Image from ${source}`}
+              className="max-w-[95vw] max-h-[95vh] object-contain"
+            />
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-4 right-4 bg-black/70 hover:bg-black/90 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold z-10"
+            >
+              ✕
+            </button>
+
+            {/* Metadata Panel - Fixed at bottom */}
+            <div className="absolute bottom-0 left-0 right-0 bg-black/90 p-4 border-t border-gray-700 max-h-48 overflow-y-auto">
               <h3 className="text-white font-bold mb-2">Detalles de la imagen</h3>
               {prompt && (
                 <div className="mb-3">

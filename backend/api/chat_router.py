@@ -61,16 +61,21 @@ TOOLS = [
     "type": "function",
     "function": {
         "name": "combine_images",
-        "description": "Combine two existing images from the gallery using Nano Banana (Gemini 2.5 Flash)",
+        "description": "Combine multiple existing images from the gallery using Nano Banana (Gemini 2.5 Flash). Can handle 2-8 images.",
         "parameters": {
             "type": "object",
             "properties": {
-                "image1_url": {"type": "string", "description": "URL of the first image to combine"},
-                "image2_url": {"type": "string", "description": "URL of the second image to combine"},
+                "image_urls": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Array of image URLs to combine (minimum 2, maximum 8 images)",
+                    "minItems": 2,
+                    "maxItems": 8
+                },
                 "prompt": {"type": "string", "description": "Instructions for how to combine the images"},
                 "output_name": {"type": "string", "description": "Name for the resulting combined image", "default": "combined_image"}
             },
-            "required": ["image1_url", "image2_url", "prompt"]
+            "required": ["image_urls", "prompt"]
         }
     }
 }]
@@ -90,8 +95,10 @@ MANDATORY BEHAVIOR - ALWAYS CALL THE APPROPRIATE TOOL:
 
 🔄 COMBINATION KEYWORDS → combine_images tool:
 - "combina", "mezcla", "fusiona", "une"
-- "dos imagenes", "2 imagenes", "primera y segunda"
+- "con estas imágenes", "usando estas", "estas X imágenes"
+- "genera usando estas imágenes" (IMPORTANT: this should use combine_images, NOT generate_images!)
 - "thumbnail", "miniatura final"
+- When user has selectedImages AND uses combination words
 
 NUMBER OF IMAGES RULES (for generate_images):
 - "una imagen" or "1 imagen" → numImages: 1
@@ -101,7 +108,8 @@ NUMBER OF IMAGES RULES (for generate_images):
 - If not specified → numImages: 3
 
 COMBINATION RULES (for combine_images):
-- User must provide 2 image URLs or reference images from gallery
+- User must have 2-8 selectedImages in context
+- Use ALL URLs from selectedImages array as image_urls parameter
 - Always ask for combination prompt (how to merge them)
 - Use descriptive output_name
 
@@ -127,7 +135,7 @@ async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
                 "messages": messages,
                 "tools": TOOLS,
                 "tool_choice": "auto",
-                "max_tokens": 1500,
+                "max_tokens": 3000,
                 "temperature": 0.1,
                 "top_p": 0.5
             },
@@ -171,39 +179,42 @@ async def call_generate_api(prompt: str, num_images: int = 3) -> Dict[str, Any]:
         logger.error(f"💥 Exception type: {type(e)}")
         raise
 
-async def call_combine_images_api(image1_url: str, image2_url: str, prompt: str, output_name: str = "combined_image") -> Dict[str, Any]:
-    """Combine two images using Gemini 2.5 Flash (Nano Banana) via OpenRouter"""
-    logger.info(f"🔄 Combining images with Nano Banana: '{prompt[:100]}...'")
+async def call_combine_images_api_multi(image_urls: List[str], prompt: str, output_name: str = "combined_image") -> Dict[str, Any]:
+    """Combine multiple images using Gemini 2.5 Flash (Nano Banana) via OpenRouter"""
+    logger.info(f"🔄 Combining {len(image_urls)} images with Nano Banana: '{prompt[:100]}...'")
 
     try:
         import base64
         import io
 
-        # Download both images first
+        # Download all images first
         async with httpx.AsyncClient() as client:
-            logger.info(f"📥 Downloading image 1: {image1_url[:100]}...")
-            img1_response = await client.get(image1_url, timeout=30.0)
-            img1_response.raise_for_status()
+            images_b64 = []
+            for i, url in enumerate(image_urls, 1):
+                logger.info(f"📥 Downloading image {i}/{len(image_urls)}: {url[:100]}...")
+                img_response = await client.get(url, timeout=30.0)
+                img_response.raise_for_status()
 
-            logger.info(f"📥 Downloading image 2: {image2_url[:100]}...")
-            img2_response = await client.get(image2_url, timeout=30.0)
-            img2_response.raise_for_status()
-
-            # Convert to base64
-            img1_b64 = base64.b64encode(img1_response.content).decode('utf-8')
-            img2_b64 = base64.b64encode(img2_response.content).decode('utf-8')
+                # Convert to base64
+                img_b64 = base64.b64encode(img_response.content).decode('utf-8')
+                images_b64.append(img_b64)
 
             # Call OpenRouter with Gemini 2.5 Flash Image
+            content = [{"type": "text", "text": f"Combine these {len(image_urls)} images as follows: {prompt}"}]
+
+            # Add all images to content
+            for i, img_b64 in enumerate(images_b64, 1):
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
+                })
+
             combine_payload = {
                 "model": "google/gemini-2.5-flash-image-preview",
                 "messages": [
                     {
                         "role": "user",
-                        "content": [
-                            {"type": "text", "text": f"Combine these two images as follows: {prompt}"},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img1_b64}"}},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img2_b64}"}}
-                        ]
+                        "content": content
                     }
                 ],
                 "modalities": ["image", "text"],
@@ -235,11 +246,11 @@ async def call_combine_images_api(image1_url: str, image2_url: str, prompt: str,
             logger.info(f"✅ Nano Banana success!")
 
             # Extract the combined image from response
-            logger.info(f"🔍 Debug - Full Nano Banana response: {result}")
+            logger.info(f"✅ Nano Banana response received, processing images...")
 
             if result.get("choices") and len(result["choices"]) > 0:
                 message = result["choices"][0].get("message", {})
-                logger.info(f"🔍 Debug - Message content: {message}")
+                logger.info(f"🔍 Debug - Message received with keys: {list(message.keys())}")
 
                 # Check if there are images in the response
                 if message.get("images"):
@@ -284,6 +295,11 @@ async def call_combine_images_api(image1_url: str, image2_url: str, prompt: str,
         logger.error(f"💥 Exception type: {type(e)}")
         raise
 
+# Backward compatibility function - calls the new multi-image function
+async def call_combine_images_api(image1_url: str, image2_url: str, prompt: str, output_name: str = "combined_image") -> Dict[str, Any]:
+    """Backward compatibility wrapper for combine_images_api_multi"""
+    return await call_combine_images_api_multi([image1_url, image2_url], prompt, output_name)
+
 def extract_prompt_fallback(json_str: str) -> Dict[str, Any]:
     """Extract prompt from malformed JSON with improved handling"""
     import re
@@ -319,10 +335,13 @@ async def chat_endpoint(request: ChatRequest):
         system_content = SYSTEM_PROMPT
 
         if request.selectedImages:
-            images_context = "\n\nSELECTED IMAGES CONTEXT:\n"
+            images_context = f"\n\nSELECTED IMAGES CONTEXT ({len(request.selectedImages)} images):\n"
+            image_urls = []
             for i, img in enumerate(request.selectedImages, 1):
                 images_context += f"Image {i}: {img.url} (ID: {img.id}, Source: {img.source})\n"
-            images_context += "\nWhen user asks to combine images, use these URLs as image1_url and image2_url parameters."
+                image_urls.append(img.url)
+            images_context += f"\nImage URLs Array: {image_urls}\n"
+            images_context += "\nWhen user asks to combine images, use ALL these URLs in the image_urls array parameter for combine_images tool."
             system_content += images_context
 
         # Prepare messages
@@ -383,12 +402,22 @@ async def chat_endpoint(request: ChatRequest):
                         logger.info(f"✅ Combine fallback extraction successful: {args}")
 
                     # Combine images using Nano Banana
-                    result = await call_combine_images_api(
-                        args["image1_url"],
-                        args["image2_url"],
-                        args["prompt"],
-                        args.get("output_name", "combined_image")
-                    )
+                    # Check if using new multi-image format or old format
+                    if "image_urls" in args:
+                        logger.info(f"🔄 Using multi-image format with {len(args['image_urls'])} images")
+                        result = await call_combine_images_api_multi(
+                            args["image_urls"],
+                            args["prompt"],
+                            args.get("output_name", "combined_image")
+                        )
+                    else:
+                        logger.info(f"🔄 Using legacy 2-image format")
+                        result = await call_combine_images_api(
+                            args["image1_url"],
+                            args["image2_url"],
+                            args["prompt"],
+                            args.get("output_name", "combined_image")
+                        )
 
                     return ChatResponse(
                         response=f"🔄 Combined images successfully! '{args['prompt'][:100]}...' Check the gallery! ✨",

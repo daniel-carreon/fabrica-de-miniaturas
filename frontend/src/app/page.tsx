@@ -7,6 +7,8 @@ import { LiquidButton } from '@/components/ui/liquid-glass-button'
 import { Download, Maximize2, Heart, Upload, FileImage, Trash2, Tag, Clock } from 'lucide-react'
 import ImageCard from '@/components/ui/ImageCard'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
+import PromptsPanel from '@/components/ui/PromptsPanel'
+import TabsNavigator from '@/components/ui/TabsNavigator'
 
 interface ApiResponse {
   images: Array<{
@@ -55,14 +57,10 @@ interface UserUpload {
 }
 
 export default function HomePage() {
-  const [prompt, setPrompt] = useState('')
-  const [numImages, setNumImages] = useState(10)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const [selectionMode, setSelectionMode] = useState(false)
-  // Panel toggles
-  const [showGeneratedPanel, setShowGeneratedPanel] = useState(true)
-  const [showFavoritesPanel, setShowFavoritesPanel] = useState(true)
-  const [showUploadsPanel, setShowUploadsPanel] = useState(true)
+  const [selectionMode, setSelectionMode] = useState<'combine' | 'delete'>('combine')
+  // Tabs system
+  const [activeTab, setActiveTab] = useState('generated')
 
   // Data states
   const [favorites, setFavorites] = useState<FavoriteImage[]>([])
@@ -89,6 +87,45 @@ export default function HomePage() {
     toggleImageSelection,
     getSelectedImages
   } = useImageStore()
+
+  // Tabs configuration
+  const tabs = [
+    {
+      id: 'generated',
+      label: 'Generated',
+      icon: '⚡',
+      count: generatedImages.filter(img => img.source === 'flux_dani' || !img.source).length + generatedHistory.filter(img => !img.is_combined).length,
+      color: 'from-purple-600 to-blue-600'
+    },
+    {
+      id: 'combined',
+      label: 'Combined',
+      icon: '🔄',
+      count: generatedImages.filter(img => img.source === 'nano_banana').length + generatedHistory.filter(img => img.is_combined).length,
+      color: 'from-orange-500 to-red-600'
+    },
+    {
+      id: 'favorites',
+      label: 'Favorites',
+      icon: '❤️',
+      count: favorites.length,
+      color: 'from-red-500 to-pink-600'
+    },
+    {
+      id: 'uploads',
+      label: 'Uploads',
+      icon: '📁',
+      count: uploads.length,
+      color: 'from-blue-500 to-cyan-600'
+    },
+    {
+      id: 'prompts',
+      label: 'Prompts',
+      icon: '📝',
+      count: 8, // We know we seeded 8 prompts
+      color: 'from-green-500 to-emerald-600'
+    }
+  ]
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -364,8 +401,8 @@ export default function HomePage() {
   const handleCombineSelected = async () => {
     const selectedImages = getSelectedImages()
 
-    if (selectedImages.length !== 2) {
-      alert('Please select exactly 2 images to combine')
+    if (selectedImages.length < 2 || selectedImages.length > 8) {
+      alert('Please select between 2-8 images to combine')
       return
     }
 
@@ -388,198 +425,129 @@ export default function HomePage() {
     }
   }
 
-  const handleGenerate = async () => {
-    if (!prompt.trim()) return
-
-    setGenerating(true)
-    clearGenerated()
-
-    try {
-      console.log('🎯 Generating images for:', prompt)
-
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt, numImages }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Generation failed')
-      }
-
-      const data: ApiResponse = await response.json()
-      console.log('📦 Raw API response:', data)
-
-      // Transform API response to store format
-      const transformedImages = data.images.map((img, index) => {
-        console.log(`🖼️ Image ${index}:`, img)
-
-        // Fix URL if it's an object (extract the actual URL string)
-        let imageUrl = img.url
-        console.log(`🔍 Original URL for image ${index}:`, imageUrl, typeof imageUrl)
-
-        if (typeof imageUrl === 'object' && imageUrl !== null) {
-          console.log(`⚠️ URL is an object:`, imageUrl)
-          // If URL is an object, try to extract the actual URL
-          imageUrl = imageUrl.url || imageUrl.href || imageUrl.src || Object.values(imageUrl)[0] || imageUrl.toString()
-        }
-
-        // Additional safety check
-        if (typeof imageUrl === 'string' && imageUrl === '[object Object]') {
-          console.error(`❌ URL is still '[object Object]' after fix attempt for image ${index}`)
-          imageUrl = `https://via.placeholder.com/640x360?text=Error+Loading+Image`
-        }
-
-        console.log(`🔗 Final URL for image ${index}:`, imageUrl, typeof imageUrl)
-
-        return {
-          ...img,
-          url: imageUrl, // Use the fixed URL
-          isSelected: false,
-          createdAt: new Date(img.timestamp)
-        }
-      })
-      setGeneratedImages(transformedImages)
-      console.log(`✅ Generated ${data.total} images successfully`)
-      console.log('🎨 Transformed images:', transformedImages)
-
-    } catch (error) {
-      console.error('❌ Generation failed:', error)
-      alert(`Failed to generate images: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    } finally {
-      setGenerating(false)
-    }
-  }
 
   return (
     <div className="space-y-8">
-      {/* Panel Toggles Header */}
+      {/* Modern Tabs Navigation */}
       <GlassCard variant="dark" className="purple-glow">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold text-white">⚙️ Dashboard Controls</h2>
-            {selectedImages.length > 0 && (
-              <div className="bg-purple-600 text-white px-3 py-1 rounded-full text-sm flex items-center gap-2">
-                <span>🔗 Selected: {selectedImages.length}/2</span>
+        <div className="space-y-4">
+          {/* Header with selection info */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-bold text-white">🚀 Media Dashboard</h2>
+
+              {/* Selection Mode Toggle */}
+              <div className="flex bg-black/20 rounded-lg p-1 border border-purple-500/30">
                 <button
-                  onClick={clearSelection}
-                  className="hover:bg-purple-700 px-1 rounded"
-                  title="Clear selection"
+                  onClick={() => setSelectionMode('combine')}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
+                    selectionMode === 'combine'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-purple-300 hover:text-white'
+                  }`}
                 >
-                  ✕
+                  🔄 Combine
+                </button>
+                <button
+                  onClick={() => setSelectionMode('delete')}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
+                    selectionMode === 'delete'
+                      ? 'bg-red-600 text-white'
+                      : 'text-purple-300 hover:text-white'
+                  }`}
+                >
+                  🗑️ Delete
                 </button>
               </div>
-            )}
+            </div>
+            <div className="flex items-center gap-3">
+              {selectedImages.length > 0 && (
+                <div className={`px-3 py-1 rounded-full text-sm flex items-center gap-2 transition-all ${
+                  selectionMode === 'combine'
+                    ? (selectedImages.length >= 2 && selectedImages.length <= 8
+                        ? 'bg-green-600 text-white'
+                        : 'bg-purple-600 text-white')
+                    : 'bg-red-600 text-white'
+                }`}>
+                  <span>
+                    {selectionMode === 'combine'
+                      ? `🔄 Selected: ${selectedImages.length}/8`
+                      : `🗑️ Selected: ${selectedImages.length}`
+                    }
+                  </span>
+                  {selectionMode === 'combine' && selectedImages.length >= 2 && selectedImages.length <= 8 && (
+                    <span className="text-xs opacity-80">✅ Ready to combine</span>
+                  )}
+                  {selectionMode === 'delete' && selectedImages.length > 0 && (
+                    <span className="text-xs opacity-80">✅ Ready to delete</span>
+                  )}
+                  <button
+                    onClick={clearSelection}
+                    className="hover:bg-black/20 px-1 rounded ml-2"
+                    title="Clear selection"
+                  >
+                    ✕
+                  </button>
+                  {selectionMode === 'delete' && selectedImages.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`¿Eliminar ${selectedImages.length} imágenes seleccionadas?`)) {
+                          // TODO: Implementar eliminación múltiple
+                          console.log('Eliminar imágenes:', selectedImages)
+                          clearSelection()
+                        }
+                      }}
+                      className="hover:bg-black/20 px-2 py-1 rounded text-xs bg-red-600/80"
+                      title="Delete selected images"
+                    >
+                      🗑️ Delete
+                    </button>
+                  )}
+                </div>
+              )}
+              <LiquidButton
+                onClick={loadAllData}
+                variant="dark"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                🔄 Refresh
+              </LiquidButton>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <LiquidButton
-              onClick={() => setShowGeneratedPanel(!showGeneratedPanel)}
-              variant={showGeneratedPanel ? "space" : "dark"}
-              size="sm"
-              className="flex items-center gap-2 px-5 py-2 min-w-[140px]"
-            >
-              <span className="text-sm font-medium whitespace-nowrap">Generated</span>
-              <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full font-bold">
-                {generatedImages.length + generatedHistory.length}
-              </span>
-            </LiquidButton>
-            <LiquidButton
-              onClick={() => setShowFavoritesPanel(!showFavoritesPanel)}
-              variant={showFavoritesPanel ? "space" : "dark"}
-              size="sm"
-              className="flex items-center gap-2 px-5 py-2 min-w-[120px]"
-            >
-              <Heart className="w-4 h-4" />
-              <span className="text-sm font-medium whitespace-nowrap">Favorites</span>
-              <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-bold">
-                {favorites.length}
-              </span>
-            </LiquidButton>
-            <LiquidButton
-              onClick={() => setShowUploadsPanel(!showUploadsPanel)}
-              variant={showUploadsPanel ? "space" : "dark"}
-              size="sm"
-              className="flex items-center gap-2 px-5 py-2 min-w-[110px]"
-            >
-              <Upload className="w-4 h-4" />
-              <span className="text-sm font-medium whitespace-nowrap">Uploads</span>
-              <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full font-bold">
-                {uploads.length}
-              </span>
-            </LiquidButton>
-            <LiquidButton
-              onClick={loadAllData}
-              variant="dark"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              🔄 Refresh
-            </LiquidButton>
-          </div>
+
+          {/* Tabs Navigator */}
+          <TabsNavigator
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            className="w-full"
+          />
         </div>
       </GlassCard>
-      {/* Current Generated Images (from Chat Agent) */}
-      {showGeneratedPanel && (generatedImages.length > 0 || generatedHistory.length > 0) && (
-        <GlassCard variant="dark" className="purple-glow">
-        </GlassCard>
-      )}
-
       {/* Status Section */}
       {isGenerating && (
         <GlassCard variant="purple" className="purple-glow">
           <div className="flex items-center space-x-3">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400"></div>
             <div>
-              <p className="text-purple-100 font-medium">🚀 Generating {numImages} images...</p>
+              <p className="text-purple-100 font-medium">🚀 AI Agent generating images...</p>
               <p className="text-purple-200 text-sm">This may take 30-60 seconds</p>
             </div>
           </div>
         </GlassCard>
       )}
 
-      {/* Current Generated Images (from Chat Agent) */}
-      {showGeneratedPanel && (generatedImages.length > 0 || generatedHistory.length > 0) && (
+      {/* Generated Images Tab */}
+      {activeTab === 'generated' && (generatedImages.filter(img => img.source === 'flux_dani' || !img.source).length > 0 || generatedHistory.filter(img => !img.is_combined).length > 0) && (
         <GlassCard variant="dark" className="purple-glow">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white">
-              ✨ Generated Images ({generatedImages.length})
+              ✨ Generated Images ({generatedImages.filter(img => img.source === 'flux_dani' || !img.source).length + generatedHistory.filter(img => !img.is_combined).length})
             </h2>
-            <div className="flex gap-3">
-              {!selectionMode ? (
-                <LiquidButton
-                  onClick={() => setSelectionMode(true)}
-                  variant="space"
-                  size="sm"
-                >
-                  🔄 Combine Mode
-                </LiquidButton>
-              ) : (
-                <>
-                  <LiquidButton
-                    onClick={handleCombineSelected}
-                    variant="space"
-                    size="sm"
-                    disabled={getSelectedImages().length !== 2}
-                    className="disabled:opacity-50"
-                  >
-                    ✨ Combine ({getSelectedImages().length}/2)
-                  </LiquidButton>
-                  <LiquidButton
-                    onClick={() => setSelectionMode(false)}
-                    variant="space"
-                    size="sm"
-                  >
-                    ❌ Cancel
-                  </LiquidButton>
-                </>
-              )}
-            </div>
           </div>
           <div className="image-grid">
-            {generatedImages.map((image) => (
+            {generatedImages.filter(img => img.source === 'flux_dani' || !img.source).map((image) => (
               <ImageCard
                 key={image.id}
                 id={image.id}
@@ -608,7 +576,7 @@ export default function HomePage() {
             ))}
 
             {/* Historical images from database */}
-            {generatedHistory.map((historyImage) => (
+            {generatedHistory.filter(img => !img.is_combined).map((historyImage) => (
               <ImageCard
                 key={`history-${historyImage.id}`}
                 id={historyImage.id}
@@ -648,8 +616,98 @@ export default function HomePage() {
         </GlassCard>
       )}
 
-      {/* Favorites Panel */}
-      {showFavoritesPanel && (
+      {/* Combined Images Tab */}
+      {activeTab === 'combined' && (
+        <GlassCard variant="dark" className="purple-glow">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white">
+              🔄 Combined Images ({generatedImages.filter(img => img.source === 'nano_banana').length + generatedHistory.filter(img => img.is_combined).length})
+            </h2>
+          </div>
+
+          {generatedImages.filter(img => img.source === 'nano_banana').length === 0 && generatedHistory.filter(img => img.is_combined).length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🔄</div>
+              <h3 className="text-lg font-medium text-white mb-2">No combined images yet</h3>
+              <p className="text-purple-200">
+                Select 2-8 images and ask the AI agent to combine them using Nano Banana!
+              </p>
+            </div>
+          ) : (
+            <div className="image-grid">
+              {/* Current session combined images */}
+              {generatedImages.filter(img => img.source === 'nano_banana').map((image) => (
+                <ImageCard
+                  key={image.id}
+                  id={image.id}
+                  url={image.url}
+                  source="combined"
+                  prompt={image.prompt}
+                  metadata={{
+                    timestamp: image.createdAt?.toLocaleString() || 'Unknown',
+                    model: 'Nano Banana (Gemini 2.5 Flash)',
+                    type: 'AI Combined'
+                  }}
+                  onToggleFavorite={(id) => {
+                    const imageToSave = generatedImages.find(img => img.id === id)
+                    if (imageToSave) handleSaveFavorite(imageToSave)
+                  }}
+                  onDelete={async (id) => {
+                    try {
+                      const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
+                      if (response.ok) {
+                        setGeneratedImages(prev => prev.filter(img => img.id !== id))
+                      }
+                    } catch (error) {
+                      console.error('Error deleting combined image:', error)
+                    }
+                  }}
+                />
+              ))}
+
+              {/* Historical combined images */}
+              {generatedHistory.filter(img => img.is_combined).map((historyImage) => (
+                <ImageCard
+                  key={`combined-history-${historyImage.id}`}
+                  id={historyImage.id}
+                  url={historyImage.replicate_url}
+                  source="combined"
+                  prompt={historyImage.prompt}
+                  metadata={{
+                    timestamp: new Date(historyImage.generated_at).toLocaleString(),
+                    model: 'Nano Banana (Gemini 2.5 Flash)',
+                    type: 'Historical Combined',
+                    session: historyImage.generation_session
+                  }}
+                  onToggleFavorite={async (id) => {
+                    const imageToSave = {
+                      id: historyImage.image_id,
+                      url: historyImage.replicate_url,
+                      prompt: historyImage.prompt,
+                      isSelected: false,
+                      createdAt: new Date(historyImage.generated_at)
+                    }
+                    await handleSaveFavorite(imageToSave)
+                  }}
+                  onDelete={async (id) => {
+                    try {
+                      const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
+                      if (response.ok) {
+                        setGeneratedHistory(prev => prev.filter(img => img.id !== id))
+                      }
+                    } catch (error) {
+                      console.error('Error deleting combined history image:', error)
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      )}
+
+      {/* Favorites Tab */}
+      {activeTab === 'favorites' && (
         <GlassCard variant="dark" className="purple-glow">
           <h2 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
             <Heart className="w-6 h-6 text-red-500" />
@@ -701,8 +759,8 @@ export default function HomePage() {
         </GlassCard>
       )}
 
-      {/* User Uploads Panel */}
-      {showUploadsPanel && (
+      {/* Uploads Tab */}
+      {activeTab === 'uploads' && (
         <GlassCard variant="dark" className="purple-glow">
           <h2 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
             <Upload className="w-6 h-6 text-blue-500" />
@@ -804,18 +862,28 @@ export default function HomePage() {
         </GlassCard>
       )}
 
-      {/* Empty State when all panels are hidden */}
-      {!showGeneratedPanel && !showFavoritesPanel && !showUploadsPanel && (
+      {/* Prompts Tab */}
+      {activeTab === 'prompts' && (
         <GlassCard variant="dark" className="purple-glow">
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">📱</div>
-            <h3 className="text-lg font-medium text-white mb-2">All panels hidden</h3>
-            <p className="text-purple-200">
-              Use the toggles above to show generated images, favorites, or uploads
-            </p>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white">
+              📝 Saved Prompts
+            </h2>
           </div>
+          <PromptsPanel onInjectPrompt={(prompt) => {
+            // For dashboard, we could show a notification or add to clipboard
+            navigator.clipboard.writeText(prompt)
+
+            // Show success notification
+            const notification = document.createElement('div')
+            notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50'
+            notification.textContent = '✅ Prompt copied to clipboard!'
+            document.body.appendChild(notification)
+            setTimeout(() => notification.remove(), 2000)
+          }} />
         </GlassCard>
       )}
+
 
       {/* Image Modal */}
       {selectedImage && (
