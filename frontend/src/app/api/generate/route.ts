@@ -33,10 +33,19 @@ export async function POST(request: NextRequest) {
     const modelVersion = process.env.NEXT_PUBLIC_MODEL_VERSION!
     const triggerWord = process.env.NEXT_PUBLIC_TRIGGER_WORD!
 
-    // Enhance prompt with trigger word if not already present
-    const enhancedPrompt = prompt.toLowerCase().includes(triggerWord.toLowerCase())
+    // DANI character description - hardcoded for consistency (short version)
+    const daniDescription = "hombre elegante, corpulento, mirada autoritaria, 8K"
+
+    // Enhance prompt with trigger word and character description
+    let enhancedPrompt = prompt.toLowerCase().includes(triggerWord.toLowerCase())
       ? prompt
       : `${triggerWord} ${prompt}`
+
+    // Only append DANI description if not coming from backend (to avoid duplication)
+    // Check if description is already in prompt
+    if (!enhancedPrompt.includes("hombre saludable") && !enhancedPrompt.includes("hombre elegante")) {
+      enhancedPrompt = `${enhancedPrompt} (${daniDescription})`
+    }
 
     console.log('🎯 Generating images with enhanced prompt:', enhancedPrompt)
 

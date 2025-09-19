@@ -42,7 +42,10 @@ export default function ImageCard({
 
   const handleExpandClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setShowModal(true)
+    // Use the global modal system from page.tsx instead of local modal
+    window.dispatchEvent(new CustomEvent('openImageModal', {
+      detail: { imageUrl: url, imageData: { id, prompt, source, metadata } }
+    }))
   }
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -190,51 +193,6 @@ export default function ImageCard({
         </div>
       </div>
 
-      {/* Modal for expanded view */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
-          <div className="relative w-screen h-screen flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={url}
-              alt={prompt || `Image from ${source}`}
-              className="max-w-[95vw] max-h-[95vh] object-contain"
-            />
-            <button
-              onClick={() => setShowModal(false)}
-              className="absolute top-4 right-4 bg-black/70 hover:bg-black/90 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold z-10"
-            >
-              ✕
-            </button>
-
-            {/* Metadata Panel - Fixed at bottom */}
-            <div className="absolute bottom-0 left-0 right-0 bg-black/90 p-4 border-t border-gray-700 max-h-48 overflow-y-auto">
-              <h3 className="text-white font-bold mb-2">Detalles de la imagen</h3>
-              {prompt && (
-                <div className="mb-3">
-                  <span className="text-purple-300 text-sm font-medium">Prompt:</span>
-                  <p className="text-gray-300 text-sm mt-1">{prompt}</p>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-purple-300 font-medium">Fuente:</span>
-                  <span className="text-gray-300 ml-2">{source}</span>
-                </div>
-                <div>
-                  <span className="text-purple-300 font-medium">ID:</span>
-                  <span className="text-gray-300 ml-2 font-mono">{id}</span>
-                </div>
-                {metadata && Object.entries(metadata).map(([key, value]) => (
-                  <div key={key}>
-                    <span className="text-purple-300 font-medium">{key}:</span>
-                    <span className="text-gray-300 ml-2">{String(value)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }

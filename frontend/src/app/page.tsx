@@ -58,7 +58,8 @@ interface UserUpload {
 
 export default function HomePage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const [selectionMode, setSelectionMode] = useState<'combine' | 'delete'>('combine')
+  const [selectedImageData, setSelectedImageData] = useState<any>(null)
+  const [combineMode, setCombineMode] = useState(true)
   // Tabs system
   const [activeTab, setActiveTab] = useState('generated')
 
@@ -94,28 +95,28 @@ export default function HomePage() {
       id: 'generated',
       label: 'Generated',
       icon: '⚡',
-      count: generatedImages.filter(img => img.source === 'flux_dani' || !img.source).length + generatedHistory.filter(img => !img.is_combined).length,
+      count: (Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.filter(img => !img.is_combined) : []).length,
       color: 'from-purple-600 to-blue-600'
     },
     {
       id: 'combined',
       label: 'Combined',
       icon: '🔄',
-      count: generatedImages.filter(img => img.source === 'nano_banana').length + generatedHistory.filter(img => img.is_combined).length,
+      count: (Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).length + (Array.isArray(generatedHistory) ? generatedHistory.filter(img => img.is_combined) : []).length,
       color: 'from-orange-500 to-red-600'
     },
     {
       id: 'favorites',
       label: 'Favorites',
       icon: '❤️',
-      count: favorites.length,
+      count: Array.isArray(favorites) ? favorites.length : 0,
       color: 'from-red-500 to-pink-600'
     },
     {
       id: 'uploads',
       label: 'Uploads',
       icon: '📁',
-      count: uploads.length,
+      count: Array.isArray(uploads) ? uploads.length : 0,
       color: 'from-blue-500 to-cyan-600'
     },
     {
@@ -131,11 +132,24 @@ export default function HomePage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && selectedImage) {
         setSelectedImage(null)
+        setSelectedImageData(null)
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [selectedImage])
+
+  // Listen for image modal events from ImageCard components
+  useEffect(() => {
+    const handleImageModal = (e: CustomEvent) => {
+      const { imageUrl, imageData } = e.detail
+      setSelectedImage(imageUrl)
+      setSelectedImageData(imageData)
+    }
+
+    window.addEventListener('openImageModal', handleImageModal as EventListener)
+    return () => window.removeEventListener('openImageModal', handleImageModal as EventListener)
+  }, [])
 
   // Load all data on component mount
   useEffect(() => {
@@ -398,6 +412,56 @@ export default function HomePage() {
     }
   }
 
+  const handleDeleteSelected = async () => {
+    if (!Array.isArray(selectedImages) || selectedImages.length === 0) return
+
+    if (confirm(`¿Eliminar ${selectedImages.length} imágenes seleccionadas?`)) {
+      try {
+        // Store selected IDs before clearing selection
+        const selectedIds = selectedImages.map(img => img.id)
+
+        // Clear selection first to prevent race conditions
+        clearSelection()
+
+        // Delete from generated images in current session (with safety check)
+        if (Array.isArray(generatedImages)) {
+          setGeneratedImages(prev =>
+            Array.isArray(prev) ? prev.filter(img => !selectedIds.includes(img.id)) : []
+          )
+        }
+
+        // Delete from database for historical images
+        const deletePromises = selectedIds.map(id =>
+          fetch(`/api/generated?id=${id}`, { method: 'DELETE' }).catch(err =>
+            console.warn(`Failed to delete ${id}:`, err)
+          )
+        )
+        await Promise.all(deletePromises)
+
+        // Delete from favorites if any
+        const favoriteDeletePromises = selectedIds.map(id =>
+          fetch(`/api/favorites/${id}`, { method: 'DELETE' }).catch(err =>
+            console.warn(`Failed to delete favorite ${id}:`, err)
+          )
+        )
+        await Promise.all(favoriteDeletePromises)
+
+        // Reload data to ensure consistency
+        await loadAllData()
+
+        // Success notification
+        const notification = document.createElement('div')
+        notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50'
+        notification.textContent = `✅ ${selectedIds.length} imágenes eliminadas`
+        document.body.appendChild(notification)
+        setTimeout(() => notification.remove(), 3000)
+      } catch (error) {
+        console.error('Error deleting images:', error)
+        alert('Error al eliminar imágenes')
+      }
+    }
+  }
+
   const handleCombineSelected = async () => {
     const selectedImages = getSelectedImages()
 
@@ -436,83 +500,60 @@ export default function HomePage() {
             <div className="flex items-center gap-4">
               <h2 className="text-xl font-bold text-white">🚀 Media Dashboard</h2>
 
-              {/* Selection Mode Toggle */}
-              <div className="flex bg-black/20 rounded-lg p-1 border border-purple-500/30">
-                <button
-                  onClick={() => setSelectionMode('combine')}
-                  className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
-                    selectionMode === 'combine'
-                      ? 'bg-purple-600 text-white'
-                      : 'text-purple-300 hover:text-white'
-                  }`}
-                >
-                  🔄 Combine
-                </button>
-                <button
-                  onClick={() => setSelectionMode('delete')}
-                  className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
-                    selectionMode === 'delete'
-                      ? 'bg-red-600 text-white'
-                      : 'text-purple-300 hover:text-white'
-                  }`}
-                >
-                  🗑️ Delete
-                </button>
-              </div>
+              {/* Simple Toggle Button */}
+              <button
+                onClick={() => {
+                  setCombineMode(!combineMode)
+                  // Clear selection when switching modes for better UX
+                  if (selectedImages.length > 0) {
+                    clearSelection()
+                  }
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border-2 flex items-center gap-2 shadow-lg ${
+                  combineMode
+                    ? 'bg-purple-600 border-purple-500 text-white hover:bg-purple-700 hover:shadow-purple-500/30'
+                    : 'bg-gray-800 border-gray-600 text-gray-400 opacity-50'
+                }`}
+              >
+                🔄 Combine
+              </button>
             </div>
             <div className="flex items-center gap-3">
               {selectedImages.length > 0 && (
-                <div className={`px-3 py-1 rounded-full text-sm flex items-center gap-2 transition-all ${
-                  selectionMode === 'combine'
-                    ? (selectedImages.length >= 2 && selectedImages.length <= 8
-                        ? 'bg-green-600 text-white'
-                        : 'bg-purple-600 text-white')
-                    : 'bg-red-600 text-white'
-                }`}>
-                  <span>
-                    {selectionMode === 'combine'
-                      ? `🔄 Selected: ${selectedImages.length}/8`
-                      : `🗑️ Selected: ${selectedImages.length}`
-                    }
-                  </span>
-                  {selectionMode === 'combine' && selectedImages.length >= 2 && selectedImages.length <= 8 && (
-                    <span className="text-xs opacity-80">✅ Ready to combine</span>
-                  )}
-                  {selectionMode === 'delete' && selectedImages.length > 0 && (
-                    <span className="text-xs opacity-80">✅ Ready to delete</span>
-                  )}
-                  <button
-                    onClick={clearSelection}
-                    className="hover:bg-black/20 px-1 rounded ml-2"
-                    title="Clear selection"
-                  >
-                    ✕
-                  </button>
-                  {selectionMode === 'delete' && selectedImages.length > 0 && (
+                <>
+                  <div className={`px-3 py-1 rounded-full text-sm flex items-center gap-2 transition-all ${
+                    combineMode
+                      ? (selectedImages.length >= 2 && selectedImages.length <= 8
+                          ? 'bg-green-600 text-white'
+                          : 'bg-purple-600 text-white')
+                      : 'bg-red-600 text-white'
+                  }`}>
+                    <span>
+                      {combineMode
+                        ? `${selectedImages.length}/8`
+                        : `${selectedImages.length} selected`
+                      }
+                    </span>
                     <button
-                      onClick={() => {
-                        if (confirm(`¿Eliminar ${selectedImages.length} imágenes seleccionadas?`)) {
-                          // TODO: Implementar eliminación múltiple
-                          console.log('Eliminar imágenes:', selectedImages)
-                          clearSelection()
-                        }
-                      }}
-                      className="hover:bg-black/20 px-2 py-1 rounded text-xs bg-red-600/80"
-                      title="Delete selected images"
+                      onClick={clearSelection}
+                      className="hover:bg-black/20 px-1 rounded"
+                      title="Clear selection"
                     >
-                      🗑️ Delete
+                      ✕
+                    </button>
+                  </div>
+                  {/* Delete Button - Only show when images are selected and not in combine mode */}
+                  {!combineMode && (
+                    <button
+                      onClick={handleDeleteSelected}
+                      className="w-10 h-10 bg-red-600 hover:bg-red-700 rounded-lg flex items-center justify-center transition-all hover:scale-110 shadow-lg"
+                      title={`Eliminar ${selectedImages.length} imágenes seleccionadas`}
+                    >
+                      <Trash2 className="w-5 h-5 text-white" />
                     </button>
                   )}
-                </div>
+                </>
               )}
-              <LiquidButton
-                onClick={loadAllData}
-                variant="dark"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                🔄 Refresh
-              </LiquidButton>
             </div>
           </div>
 
@@ -539,40 +580,116 @@ export default function HomePage() {
       )}
 
       {/* Generated Images Tab */}
-      {activeTab === 'generated' && (generatedImages.filter(img => img.source === 'flux_dani' || !img.source).length > 0 || generatedHistory.filter(img => !img.is_combined).length > 0) && (
+      {activeTab === 'generated' && ((Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length > 0 || (Array.isArray(generatedHistory) ? generatedHistory.filter(img => !img.is_combined) : []).length > 0) && (
         <GlassCard variant="dark" className="purple-glow">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white">
-              ✨ Generated Images ({generatedImages.filter(img => img.source === 'flux_dani' || !img.source).length + generatedHistory.filter(img => !img.is_combined).length})
+              ✨ Generated Images ({(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.filter(img => !img.is_combined) : []).length})
             </h2>
           </div>
           <div className="image-grid">
-            {generatedImages.filter(img => img.source === 'flux_dani' || !img.source).map((image) => (
-              <ImageCard
-                key={image.id}
-                id={image.id}
-                url={image.url}
-                source="generated"
-                prompt={image.prompt}
-                metadata={{
-                  timestamp: image.createdAt?.toLocaleString() || 'Unknown',
-                  model: 'Flux Dev + DANI LoRA'
-                }}
-                onToggleFavorite={(id) => {
-                  const imageToSave = generatedImages.find(img => img.id === id)
-                  if (imageToSave) handleSaveFavorite(imageToSave)
-                }}
-                onDelete={async (id) => {
-                  try {
-                    const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
-                    if (response.ok) {
-                      setGeneratedImages(prev => prev.filter(img => img.id !== id))
+            {(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).map((image) => (
+              <div key={image.id} className="relative group">
+                <img
+                  src={image.url}
+                  alt={image.prompt}
+                  className="w-full h-32 object-cover rounded-lg transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                />
+
+                {/* Selection Checkbox - Always visible */}
+                <div className="absolute top-2 left-2 z-10">
+                  <div className={`
+                    w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-200
+                    ${isImageSelected(image.id)
+                      ? 'bg-purple-600 border-purple-600 text-white scale-110 shadow-lg'
+                      : 'bg-black/50 border-white/70 text-white backdrop-blur-sm hover:bg-purple-500/70 hover:border-purple-400'
                     }
-                  } catch (error) {
-                    console.error('Error deleting generated image:', error)
-                  }
-                }}
-              />
+                  `}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (!isImageDisabled(image.id)) {
+                        handleImageSelect(image.id, image.url, 'generated')
+                      }
+                    }}
+                  >
+                    {isImageSelected(image.id) && '✓'}
+                  </div>
+                </div>
+
+                {/* Hover Controls - Bottom positioned */}
+                <div className="absolute bottom-2 left-2 right-2 flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  {/* Expand/Modal */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedImage(image.url)
+                      setSelectedImageData({
+                        id: image.id,
+                        prompt: image.prompt,
+                        source: 'generated',
+                        metadata: {
+                          timestamp: image.createdAt?.toLocaleString() || 'Unknown',
+                          model: 'Flux Dev + DANI LoRA'
+                        }
+                      })
+                    }}
+                    className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all hover:scale-110"
+                    title="Ver detalles"
+                  >
+                    <Maximize2 className="w-4 h-4 text-white" />
+                  </button>
+
+                  {/* Download */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDownloadImage(image)
+                    }}
+                    className="w-8 h-8 bg-black/70 hover:bg-black/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all hover:scale-110"
+                    title="Descargar"
+                  >
+                    <Download className="w-4 h-4 text-white" />
+                  </button>
+
+                  {/* Favorite */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSaveFavorite(image)
+                    }}
+                    className="w-8 h-8 bg-black/70 hover:bg-red-500/70 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all hover:scale-110"
+                    title="Agregar a favoritos"
+                  >
+                    <Heart className="w-4 h-4 text-white" />
+                  </button>
+
+                  {/* Delete */}
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (!combineMode && selectedImages.length > 0) {
+                        // In delete mode with selections, delete all selected
+                        handleDeleteSelected()
+                      } else {
+                        // In combine mode or no selections, delete just this one
+                        try {
+                          const response = await fetch(`/api/generated?id=${image.id}`, { method: 'DELETE' })
+                          if (response.ok) {
+                            setGeneratedImages(prev => prev.filter(img => img.id !== image.id))
+                          }
+                        } catch (error) {
+                          console.error('Error deleting generated image:', error)
+                        }
+                      }
+                    }}
+                    className="w-8 h-8 bg-red-500/80 hover:bg-red-600/90 backdrop-blur-sm rounded-lg flex items-center justify-center transition-all hover:scale-110"
+                    title="Borrar imagen"
+                  >
+                    <Trash2 className="w-4 h-4 text-white" />
+                  </button>
+                </div>
+              </div>
             ))}
 
             {/* Historical images from database */}
@@ -601,13 +718,19 @@ export default function HomePage() {
                   await handleSaveFavorite(imageToSave)
                 }}
                 onDelete={async (id) => {
-                  try {
-                    const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
-                    if (response.ok) {
-                      setGeneratedHistory(prev => prev.filter(img => img.id !== id))
+                  if (!combineMode && selectedImages.length > 0) {
+                    // In delete mode with selections, delete all selected
+                    handleDeleteSelected()
+                  } else {
+                    // In combine mode or no selections, delete just this one
+                    try {
+                      const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
+                      if (response.ok) {
+                        setGeneratedHistory(prev => prev.filter(img => img.id !== id))
+                      }
+                    } catch (error) {
+                      console.error('Error deleting generated history image:', error)
                     }
-                  } catch (error) {
-                    console.error('Error deleting generated history image:', error)
                   }
                 }}
               />
@@ -621,11 +744,11 @@ export default function HomePage() {
         <GlassCard variant="dark" className="purple-glow">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white">
-              🔄 Combined Images ({generatedImages.filter(img => img.source === 'nano_banana').length + generatedHistory.filter(img => img.is_combined).length})
+              🔄 Combined Images ({(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).length + (Array.isArray(generatedHistory) ? generatedHistory.filter(img => img.is_combined) : []).length})
             </h2>
           </div>
 
-          {generatedImages.filter(img => img.source === 'nano_banana').length === 0 && generatedHistory.filter(img => img.is_combined).length === 0 ? (
+          {(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).length === 0 && (Array.isArray(generatedHistory) ? generatedHistory.filter(img => img.is_combined) : []).length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">🔄</div>
               <h3 className="text-lg font-medium text-white mb-2">No combined images yet</h3>
@@ -636,7 +759,7 @@ export default function HomePage() {
           ) : (
             <div className="image-grid">
               {/* Current session combined images */}
-              {generatedImages.filter(img => img.source === 'nano_banana').map((image) => (
+              {(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).map((image) => (
                 <ImageCard
                   key={image.id}
                   id={image.id}
@@ -649,17 +772,23 @@ export default function HomePage() {
                     type: 'AI Combined'
                   }}
                   onToggleFavorite={(id) => {
-                    const imageToSave = generatedImages.find(img => img.id === id)
+                    const imageToSave = Array.isArray(generatedImages) ? generatedImages.find(img => img.id === id) : null
                     if (imageToSave) handleSaveFavorite(imageToSave)
                   }}
                   onDelete={async (id) => {
-                    try {
-                      const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
-                      if (response.ok) {
-                        setGeneratedImages(prev => prev.filter(img => img.id !== id))
+                    if (!combineMode && selectedImages.length > 0) {
+                      // In delete mode with selections, delete all selected
+                      handleDeleteSelected()
+                    } else {
+                      // In combine mode or no selections, delete just this one
+                      try {
+                        const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
+                        if (response.ok) {
+                          setGeneratedImages(prev => prev.filter(img => img.id !== id))
+                        }
+                      } catch (error) {
+                        console.error('Error deleting combined image:', error)
                       }
-                    } catch (error) {
-                      console.error('Error deleting combined image:', error)
                     }
                   }}
                 />
@@ -690,13 +819,19 @@ export default function HomePage() {
                     await handleSaveFavorite(imageToSave)
                   }}
                   onDelete={async (id) => {
-                    try {
-                      const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
-                      if (response.ok) {
-                        setGeneratedHistory(prev => prev.filter(img => img.id !== id))
+                    if (!combineMode && selectedImages.length > 0) {
+                      // In delete mode with selections, delete all selected
+                      handleDeleteSelected()
+                    } else {
+                      // In combine mode or no selections, delete just this one
+                      try {
+                        const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
+                        if (response.ok) {
+                          setGeneratedHistory(prev => prev.filter(img => img.id !== id))
+                        }
+                      } catch (error) {
+                        console.error('Error deleting combined history image:', error)
                       }
-                    } catch (error) {
-                      console.error('Error deleting combined history image:', error)
                     }
                   }}
                 />
@@ -741,14 +876,20 @@ export default function HomePage() {
                     originalModel: favorite.model_version || 'Unknown'
                   }}
                   onDelete={async (id) => {
-                    if (confirm('¿Remover de favoritos?')) {
-                      try {
-                        const response = await fetch(`/api/favorites/${id}`, { method: 'DELETE' })
-                        if (response.ok) {
-                          setFavorites(prev => prev.filter(fav => fav.id !== id))
+                    if (!combineMode && selectedImages.length > 0) {
+                      // In delete mode with selections, delete all selected
+                      handleDeleteSelected()
+                    } else {
+                      // In combine mode or no selections, delete just this one
+                      if (confirm('¿Remover de favoritos?')) {
+                        try {
+                          const response = await fetch(`/api/favorites/${id}`, { method: 'DELETE' })
+                          if (response.ok) {
+                            setFavorites(prev => prev.filter(fav => fav.id !== id))
+                          }
+                        } catch (error) {
+                          console.error('Error deleting favorite:', error)
                         }
-                      } catch (error) {
-                        console.error('Error deleting favorite:', error)
                       }
                     }
                   }}
@@ -854,7 +995,15 @@ export default function HomePage() {
                     uploadedAt: new Date(upload.uploaded_at).toLocaleDateString(),
                     tags: upload.tags.join(', ') || 'No tags'
                   }}
-                  onDelete={(id) => handleDeleteUpload(id)}
+                  onDelete={(id) => {
+                    if (!combineMode && selectedImages.length > 0) {
+                      // In delete mode with selections, delete all selected
+                      handleDeleteSelected()
+                    } else {
+                      // In combine mode or no selections, delete just this one
+                      handleDeleteUpload(id)
+                    }
+                  }}
                 />
               ))}
             </div>
@@ -885,25 +1034,81 @@ export default function HomePage() {
       )}
 
 
-      {/* Image Modal */}
+      {/* Simple Image Modal with Scroll */}
       {selectedImage && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedImage(null)}
+          className="fixed inset-0 bg-black z-50 overflow-y-auto"
+          onClick={() => {
+            setSelectedImage(null)
+            setSelectedImageData(null)
+          }}
         >
-          <div className="relative max-w-4xl max-h-[90vh] w-full">
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute -top-4 -right-4 bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl font-bold transition-colors z-10"
-            >
-              ✕
-            </button>
-            <img
-              src={selectedImage}
-              alt="Imagen ampliada"
-              className="w-full h-full object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
+          {/* Close button - fixed position */}
+          <button
+            onClick={() => {
+              setSelectedImage(null)
+              setSelectedImageData(null)
+            }}
+            className="fixed top-6 right-6 bg-red-600/80 hover:bg-red-700/90 text-white w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold transition-colors z-10 border-2 border-white/20 shadow-xl"
+          >
+            ✕
+          </button>
+
+          {/* Scrollable content */}
+          <div className="min-h-screen flex flex-col">
+            {/* Image - takes full viewport height */}
+            <div className="h-screen flex items-center justify-center p-4">
+              <img
+                src={selectedImage}
+                alt={selectedImageData?.prompt || "Imagen ampliada"}
+                className="max-w-full max-h-full object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            {/* Text content below - only shows when scrolling down */}
+            {selectedImageData && (
+              <div className="bg-black/95 p-8 border-t border-purple-500/30">
+                <div className="max-w-4xl mx-auto">
+                  <div className="text-purple-300 font-medium text-lg mb-4 flex items-center gap-3">
+                    {selectedImageData.source === 'combined' ? '🔄 Combined Image' :
+                     selectedImageData.source === 'favorites' ? '❤️ Favorite Image' :
+                     '✨ Generated Image'}
+                    {selectedImageData.metadata?.model && (
+                      <span className="text-sm bg-purple-600/20 px-3 py-1 rounded-full">
+                        {selectedImageData.metadata.model}
+                      </span>
+                    )}
+                  </div>
+
+                  {selectedImageData.prompt && (
+                    <div className="mb-6">
+                      <h3 className="text-purple-300 font-medium mb-2">Prompt:</h3>
+                      <p className="text-gray-300 leading-relaxed">
+                        {selectedImageData.prompt}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedImageData.metadata && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      {selectedImageData.metadata.timestamp && (
+                        <div>
+                          <span className="text-purple-300 font-medium">Fecha:</span>
+                          <div className="text-gray-300 mt-1">{selectedImageData.metadata.timestamp}</div>
+                        </div>
+                      )}
+                      {selectedImageData.id && (
+                        <div>
+                          <span className="text-purple-300 font-medium">ID:</span>
+                          <div className="text-gray-300 font-mono mt-1">{selectedImageData.id}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

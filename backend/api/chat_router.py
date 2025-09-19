@@ -80,7 +80,7 @@ TOOLS = [
     }
 }]
 
-# System prompt - deterministic
+# System prompt - deterministic with concise prompt optimization
 SYSTEM_PROMPT = """You are a deterministic multi-tool image assistant. You have TWO tools available:
 
 1. generate_images: Generate new images using DANI fine-tuned model
@@ -113,8 +113,10 @@ COMBINATION RULES (for combine_images):
 - Always ask for combination prompt (how to merge them)
 - Use descriptive output_name
 
+IMPORTANT: Keep prompts CONCISE (under 200 chars) to avoid GPU memory issues. Focus on key elements only.
+
 EXAMPLES:
-"genera 3 imagenes de DANI tech reviewer" → CALL generate_images
+"genera 3 imagenes de DANI tech reviewer" → CALL generate_images with prompt: "DANI tech reviewer setup"
 "combina la primera y segunda imagen para hacer thumbnail" → CALL combine_images
 
 Temperature=0. Be 100% consistent."""
@@ -145,13 +147,21 @@ async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
         return response.json()
 
 async def call_generate_api(prompt: str, num_images: int = 3) -> Dict[str, Any]:
-    """Call frontend generate API"""
-    logger.info(f"🚀 Calling Replicate with prompt: '{prompt[:100]}...' and {num_images} images")
+    """Call frontend generate API with enhanced DANI description"""
+    # DANI character description - optimized short version
+    dani_description = "hombre saludable, corpulento, elegante, mirada autoritaria, líder IA, 8K"
+
+    # Enhance prompt with DANI description if DANI is mentioned
+    enhanced_prompt = prompt
+    if "DANI" in prompt.upper():
+        enhanced_prompt = f"{prompt} ({dani_description})"
+
+    logger.info(f"🚀 Calling Replicate with enhanced prompt: '{enhanced_prompt[:100]}...' and {num_images} images")
 
     try:
         async with httpx.AsyncClient() as client:
             url = f"{FRONTEND_URL}/api/generate"
-            payload = {"prompt": prompt, "numImages": num_images}
+            payload = {"prompt": enhanced_prompt, "numImages": num_images}
 
             logger.info(f"📡 POST {url}")
             logger.info(f"📦 Payload: {payload}")
@@ -377,7 +387,7 @@ async def chat_endpoint(request: ChatRequest):
                     result = await call_generate_api(args["prompt"], args.get("numImages", 3))
 
                     return ChatResponse(
-                        response=f"✨ Generated {result['total']} images with prompt '{args['prompt'][:100]}...' Check the gallery! 🎨",
+                        response=f"✨ Generated {result['total']} images with DANI prompt '{args['prompt'][:100]}...' Check the gallery! 🎨",
                         tool_used="generate_images",
                         tool_result=result,
                         usage=data.get("usage"),

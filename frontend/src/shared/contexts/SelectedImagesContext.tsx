@@ -22,7 +22,7 @@ const SelectedImagesContext = createContext<SelectedImagesContextType | undefine
 
 export function SelectedImagesProvider({ children }: { children: ReactNode }) {
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([])
-  const maxSelection = 8
+  const maxSelection = 50 // Much higher limit for delete mode
 
   const handleImageSelect = (imageId: string, imageUrl: string, source: string) => {
     const isAlreadySelected = selectedImages.some(img => img.id === imageId)

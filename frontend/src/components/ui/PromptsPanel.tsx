@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Heart, Copy, Edit, Trash2, Tag } from 'lucide-react'
+import { Plus, Search, Heart, Copy, Edit, Trash2, Tag, X } from 'lucide-react'
 import GlassCard from './glass-card'
 import { LiquidButton } from './liquid-glass-button'
 
@@ -21,6 +21,14 @@ interface PromptsPanelProps {
   onInjectPrompt: (prompt: string) => void
 }
 
+interface CreatePromptData {
+  name: string
+  prompt: string
+  category: 'thumbnail' | 'portrait' | 'background' | 'custom'
+  tags: string[]
+  is_favorite: boolean
+}
+
 export default function PromptsPanel({ onInjectPrompt }: PromptsPanelProps) {
   const [prompts, setPrompts] = useState<SavedPrompt[]>([])
   const [loading, setLoading] = useState(false)
@@ -28,6 +36,14 @@ export default function PromptsPanel({ onInjectPrompt }: PromptsPanelProps) {
   const [showFavorites, setShowFavorites] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createPromptData, setCreatePromptData] = useState<CreatePromptData>({
+    name: '',
+    prompt: '',
+    category: 'custom',
+    tags: [],
+    is_favorite: false
+  })
+  const [isCreating, setIsCreating] = useState(false)
 
   // Load prompts from API
   const loadPrompts = async () => {
@@ -116,10 +132,78 @@ export default function PromptsPanel({ onInjectPrompt }: PromptsPanelProps) {
 
       if (response.ok) {
         loadPrompts()
+        // Show success notification
+        const notification = document.createElement('div')
+        notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50'
+        notification.textContent = `✅ Prompt "${prompt.name}" eliminado!`
+        document.body.appendChild(notification)
+        setTimeout(() => notification.remove(), 2000)
       }
     } catch (error) {
       console.error('Error deleting prompt:', error)
+      // Show error notification
+      const notification = document.createElement('div')
+      notification.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50'
+      notification.textContent = `❌ Error al eliminar prompt`
+      document.body.appendChild(notification)
+      setTimeout(() => notification.remove(), 3000)
     }
+  }
+
+  // Create new prompt
+  const handleCreatePrompt = async () => {
+    if (!createPromptData.name || !createPromptData.prompt) {
+      alert('Nombre y prompt son requeridos')
+      return
+    }
+
+    try {
+      setIsCreating(true)
+      const response = await fetch('/api/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createPromptData)
+      })
+
+      if (response.ok) {
+        // Reset form
+        setCreatePromptData({
+          name: '',
+          prompt: '',
+          category: 'custom',
+          tags: [],
+          is_favorite: false
+        })
+        setShowCreateModal(false)
+        loadPrompts()
+
+        // Show success notification
+        const notification = document.createElement('div')
+        notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50'
+        notification.textContent = `✅ Prompt "${createPromptData.name}" creado!`
+        document.body.appendChild(notification)
+        setTimeout(() => notification.remove(), 2000)
+      } else {
+        const data = await response.json()
+        throw new Error(data.error || 'Error al crear prompt')
+      }
+    } catch (error) {
+      console.error('Error creating prompt:', error)
+      // Show error notification
+      const notification = document.createElement('div')
+      notification.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50'
+      notification.textContent = `❌ ${error instanceof Error ? error.message : 'Error al crear prompt'}`
+      document.body.appendChild(notification)
+      setTimeout(() => notification.remove(), 3000)
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  // Handle tags input
+  const handleTagsChange = (tagsString: string) => {
+    const tags = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+    setCreatePromptData(prev => ({ ...prev, tags }))
   }
 
   const categories = [
@@ -288,6 +372,109 @@ export default function PromptsPanel({ onInjectPrompt }: PromptsPanelProps) {
           </div>
         )}
       </div>
+
+      {/* Create Prompt Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-purple-500/30 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white">✨ Crear Nuevo Prompt</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="w-8 h-8 bg-red-600 hover:bg-red-700 rounded-lg flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-purple-300 text-sm font-medium mb-2">Nombre del Prompt</label>
+                <input
+                  type="text"
+                  value={createPromptData.name}
+                  onChange={(e) => setCreatePromptData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Ej: DANI Excited Reaction"
+                  className="w-full bg-black/30 border border-purple-500/30 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-400"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-purple-300 text-sm font-medium mb-2">Categoría</label>
+                <select
+                  value={createPromptData.category}
+                  onChange={(e) => setCreatePromptData(prev => ({ ...prev, category: e.target.value as any }))}
+                  className="w-full bg-black/30 border border-purple-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400"
+                >
+                  <option value="thumbnail">🖼️ Miniaturas</option>
+                  <option value="portrait">👤 Retratos</option>
+                  <option value="background">🌄 Fondos</option>
+                  <option value="custom">⭐ Personalizado</option>
+                </select>
+              </div>
+
+              {/* Prompt */}
+              <div>
+                <label className="block text-purple-300 text-sm font-medium mb-2">Prompt</label>
+                <textarea
+                  value={createPromptData.prompt}
+                  onChange={(e) => setCreatePromptData(prev => ({ ...prev, prompt: e.target.value }))}
+                  placeholder="DANI excited surprised expression, wide eyes, pointing gesture, dynamic pose, bright colorful background, perfect for reaction thumbnail, energetic mood"
+                  rows={5}
+                  className="w-full bg-black/30 border border-purple-500/30 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-400 resize-none"
+                />
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block text-purple-300 text-sm font-medium mb-2">Tags (separados por comas)</label>
+                <input
+                  type="text"
+                  value={createPromptData.tags.join(', ')}
+                  onChange={(e) => handleTagsChange(e.target.value)}
+                  placeholder="excited, reaction, dynamic, colorful"
+                  className="w-full bg-black/30 border border-purple-500/30 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-400"
+                />
+              </div>
+
+              {/* Favorite checkbox */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is-favorite"
+                  checked={createPromptData.is_favorite}
+                  onChange={(e) => setCreatePromptData(prev => ({ ...prev, is_favorite: e.target.checked }))}
+                  className="w-4 h-4 text-purple-600 border-purple-500/30 rounded focus:ring-purple-500"
+                />
+                <label htmlFor="is-favorite" className="text-white text-sm">
+                  ❤️ Marcar como favorito
+                </label>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-3 pt-4">
+                <LiquidButton
+                  onClick={() => setShowCreateModal(false)}
+                  variant="dark"
+                  className="flex-1"
+                >
+                  Cancelar
+                </LiquidButton>
+                <LiquidButton
+                  onClick={handleCreatePrompt}
+                  disabled={isCreating || !createPromptData.name || !createPromptData.prompt}
+                  variant="space"
+                  className="flex-1 disabled:opacity-50"
+                >
+                  {isCreating ? '⏳ Creando...' : '✨ Crear Prompt'}
+                </LiquidButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </GlassCard>
   )
 }

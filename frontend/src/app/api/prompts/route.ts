@@ -111,3 +111,91 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+// PUT - Update saved prompt
+export async function PUT(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const promptId = searchParams.get('id')
+
+    if (!promptId) {
+      return NextResponse.json(
+        { error: 'Prompt ID is required' },
+        { status: 400 }
+      )
+    }
+
+    const updateData = await request.json()
+
+    const { data, error } = await supabase
+      .from('saved_prompts')
+      .update(updateData)
+      .eq('id', promptId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('❌ Database error:', error)
+      throw new Error(`Database update failed: ${error.message}`)
+    }
+
+    console.log('✅ Successfully updated saved prompt:', data.id)
+
+    return NextResponse.json({
+      success: true,
+      data
+    })
+
+  } catch (error) {
+    console.error('❌ Update saved prompt failed:', error)
+    return NextResponse.json(
+      {
+        error: 'Failed to update saved prompt',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE - Delete saved prompt
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const promptId = searchParams.get('id')
+
+    if (!promptId) {
+      return NextResponse.json(
+        { error: 'Prompt ID is required' },
+        { status: 400 }
+      )
+    }
+
+    const { error } = await supabase
+      .from('saved_prompts')
+      .delete()
+      .eq('id', promptId)
+
+    if (error) {
+      console.error('❌ Database error:', error)
+      throw new Error(`Database delete failed: ${error.message}`)
+    }
+
+    console.log('✅ Successfully deleted saved prompt:', promptId)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Prompt deleted successfully'
+    })
+
+  } catch (error) {
+    console.error('❌ Delete saved prompt failed:', error)
+    return NextResponse.json(
+      {
+        error: 'Failed to delete saved prompt',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    )
+  }
+}
