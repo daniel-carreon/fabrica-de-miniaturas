@@ -106,6 +106,7 @@ class ChatResponse(BaseModel):
     tool_result: Optional[Dict[str, Any]] = None
     usage: Optional[Dict[str, Any]] = None
     model: Optional[str] = None
+    reasoning_details: Optional[List[Dict[str, Any]]] = None
 
 # OpenRouter config
 OPENROUTER_API_KEY = "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"
@@ -153,9 +154,15 @@ TOOLS = [
 }]
 
 # System prompt - deterministic with concise prompt optimization
-SYSTEM_PROMPT = """You are a deterministic multi-tool image assistant. You have TWO tools available:
+SYSTEM_PROMPT = """You are a deterministic multi-tool image assistant with ADVANCED VISION CAPABILITIES. You have THREE core capabilities:
 
-1. generate_images: Generate new images using DANI fine-tuned model
+👁️ VISION ANALYSIS: You can SEE and analyze any images the user has selected
+- Describe content, composition, lighting, style, quality, and facial features
+- Provide intelligent suggestions based on visual analysis
+- Make informed decisions about combinations using what you observe
+- Analyze technical aspects like resolution, format, and artistic quality
+
+🎨 generate_images: Generate new images using DANI fine-tuned model
 2. combine_images: Combine two existing images using Nano Banana
 
 MANDATORY BEHAVIOR - ALWAYS CALL THE APPROPRIATE TOOL:
@@ -172,6 +179,11 @@ MANDATORY BEHAVIOR - ALWAYS CALL THE APPROPRIATE TOOL:
 - "thumbnail", "miniatura final"
 - When user has selectedImages AND uses combination words
 
+👁️ VISION ANALYSIS KEYWORDS → Provide visual analysis without tool calling:
+- "analiza", "describe", "que ves", "como se ve"
+- "calidad", "composición", "lighting", "style"
+- "qué opinas", "sugerencias", "recomendaciones"
+
 NUMBER OF IMAGES RULES (for generate_images):
 - "una imagen" or "1 imagen" → numImages: 1
 - "dos imagenes" or "2 imagenes" → numImages: 2
@@ -182,8 +194,8 @@ NUMBER OF IMAGES RULES (for generate_images):
 COMBINATION RULES (for combine_images):
 - User must have 2-8 selectedImages in context
 - Use ALL URLs from selectedImages array as image_urls parameter
-- Always ask for combination prompt (how to merge them)
-- Use descriptive output_name
+- Leverage your vision analysis to create better combination prompts
+- Use descriptive output_name based on what you see
 - BATCH VARIATIONS:
   - "genera 5 variaciones" → num_variations: 5
   - "varias versiones" → num_variations: 3
@@ -195,6 +207,7 @@ IMPORTANT: Keep prompts CONCISE (under 200 chars) to avoid GPU memory issues. Fo
 EXAMPLES:
 "genera 3 imagenes de DANI tech reviewer" → CALL generate_images with prompt: "DANI tech reviewer setup"
 "combina la primera y segunda imagen para hacer thumbnail" → CALL combine_images
+"analiza estas imágenes" → Provide detailed visual analysis without tools
 
 Temperature=0. Be 100% consistent."""
 
@@ -322,7 +335,7 @@ async def translate_to_english(text: str) -> str:
                     'X-Title': 'Daniel Flux Context - Translator'
                 },
                 json={
-                    "model": "gpt-5-mini",
+                    "model": "openai/gpt-5",
                     "messages": [
                         {"role": "system", "content": "Translate the following Spanish text to English. Keep technical terms, names, and specific instructions intact. Only return the translation, no explanations."},
                         {"role": "user", "content": text}
@@ -352,11 +365,16 @@ async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
                 'X-Title': 'Daniel Flux Context'
             },
             json={
-                "model": "gpt-5-mini",
+                "model": "openai/gpt-5",
                 "messages": messages,
                 "tools": TOOLS,
                 "tool_choice": "auto",
-                "max_tokens": 3000,
+                "max_tokens": 5000,  # Increased for long URL arrays
+                "reasoning": {
+                    "effort": "medium",  # Optimal balance for tool calling
+                    "verbosity": 0.7,    # Detailed but not verbose responses
+                    "exclude": False     # Show reasoning process to user
+                },
                 "temperature": 0.1,
                 "top_p": 0.5
             },
@@ -649,10 +667,20 @@ def extract_prompt_fallback(json_str: str) -> Dict[str, Any]:
     """Extract prompt from malformed JSON with improved handling"""
     import re
 
-    # Try to fix incomplete JSON by adding missing closing brace
+    # Try to fix incomplete JSON by adding missing closing brace and brackets
     fixed_json = json_str.strip()
-    if not fixed_json.endswith('}'):
-        fixed_json += '"}'
+    logger.info(f"🔧 Fallback parsing JSON: {json_str[:200]}...")
+
+    # Handle truncated URL arrays specifically for combine_images
+    if '"image_urls":[' in fixed_json:
+        # Try to close the array and object properly
+        if not fixed_json.endswith(']}'):
+            if not fixed_json.endswith(']'):
+                fixed_json += '"]}'
+            elif not fixed_json.endswith('}'):
+                fixed_json += '}'
+    elif not fixed_json.endswith('}'):
+        fixed_json += '}'
 
     # Try parsing the fixed JSON first
     try:
@@ -706,16 +734,62 @@ async def chat_endpoint(request: ChatRequest):
             images_context += "\nWhen user asks to combine images, use ALL these URLs in the image_urls array parameter for combine_images tool."
             system_content += images_context
 
-        # Prepare messages
+        # Prepare messages with multimodal support
         messages = [{"role": "system", "content": system_content}]
+
+        # Add conversation history (text only)
         for msg in request.messages[-10:]:
             messages.append({"role": msg.role, "content": msg.content})
-        messages.append({"role": "user", "content": request.message})
+
+        # Prepare user message with vision capabilities
+        user_message_content = []
+        user_message_content.append({"type": "text", "text": request.message})
+
+        # Add selected images for GPT-5 vision analysis if available
+        if request.selectedImages:
+            logger.info(f"👁️ Adding {len(request.selectedImages)} images for GPT-5 vision analysis")
+            for i, img in enumerate(request.selectedImages):
+                user_message_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": img.url}
+                })
+                logger.info(f"🖼️ Image {i+1}: {img.url[:100]}... (Source: {img.source})")
+
+        # Add the multimodal user message
+        messages.append({
+            "role": "user",
+            "content": user_message_content if len(user_message_content) > 1 else request.message
+        })
 
         # Call OpenRouter
         data = await call_openrouter(messages)
         choice = data.get("choices", [{}])[0]
         response_msg = choice.get("message", {})
+
+        # Debug: Log the full response structure
+        logger.info(f"🔍 OpenRouter response structure: {list(data.keys())}")
+        logger.info(f"🔍 Message keys: {list(response_msg.keys())}")
+        if "reasoning" in response_msg:
+            logger.info(f"🔍 Reasoning type: {type(response_msg['reasoning'])}")
+            logger.info(f"🔍 Reasoning sample: {str(response_msg['reasoning'])[:200]}...")
+
+        # Extract reasoning details if available
+        raw_reasoning = response_msg.get("reasoning", [])
+        reasoning_details = []
+
+        # Handle different reasoning formats from OpenRouter
+        if raw_reasoning:
+            if isinstance(raw_reasoning, list):
+                reasoning_details = raw_reasoning
+            elif isinstance(raw_reasoning, str):
+                # Convert string reasoning to structured format
+                reasoning_details = [{
+                    "type": "raw_text",
+                    "content": raw_reasoning
+                }]
+            else:
+                logger.warning(f"⚠️ Unexpected reasoning format: {type(raw_reasoning)}")
+                reasoning_details = []
 
         # Check for tool calls
         if response_msg.get("tool_calls"):
@@ -748,10 +822,11 @@ async def chat_endpoint(request: ChatRequest):
                         tool_used="generate_images",
                         tool_result=result,
                         usage=data.get("usage"),
-                        model=data.get("model")
+                        model=data.get("model"),
+                        reasoning_details=reasoning_details
                     )
                 except Exception as e:
-                    return ChatResponse(response=f"❌ Error generating images: {str(e)}")
+                    return ChatResponse(response=f"❌ Error generating images: {str(e)}", reasoning_details=reasoning_details)
 
             elif tool_call["function"]["name"] == "combine_images":
                 try:
@@ -800,16 +875,18 @@ async def chat_endpoint(request: ChatRequest):
                         tool_used="combine_images",
                         tool_result=result,
                         usage=data.get("usage"),
-                        model=data.get("model")
+                        model=data.get("model"),
+                        reasoning_details=reasoning_details
                     )
                 except Exception as e:
-                    return ChatResponse(response=f"❌ Error combining images: {str(e)}")
+                    return ChatResponse(response=f"❌ Error combining images: {str(e)}", reasoning_details=reasoning_details)
 
         # No tool call - return text response
         return ChatResponse(
             response=response_msg.get("content", "I apologize, but I could not generate a response."),
             usage=data.get("usage"),
-            model=data.get("model")
+            model=data.get("model"),
+            reasoning_details=reasoning_details
         )
 
     except Exception as e:

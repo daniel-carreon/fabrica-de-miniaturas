@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
       try {
         const output = await replicate.run(
-          `${modelName}/${modelVersion}` as any,
+          `${modelName}:${modelVersion}` as any,
           {
             input: {
               prompt: enhancedPrompt,

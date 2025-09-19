@@ -4,8 +4,10 @@ import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ChatAgent from '@/features/chat/components/ChatAgent'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
-import { Bot } from 'lucide-react'
+import { Bot, Settings } from 'lucide-react'
 import { SelectedImagesProvider } from '@/shared/contexts/SelectedImagesContext'
+import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
+import { useImageConfig } from '@/shared/stores/imageConfigStore'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -14,9 +16,11 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const router = useRouter()
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [isConfigOpen, setIsConfigOpen] = useState(false)
   const [chatWidth, setChatWidth] = useState(384) // 96 * 4 = 384px (w-96)
   const [isDragging, setIsDragging] = useState(false)
   const dragRef = useRef<number>(0)
+  const { config, updateConfig } = useImageConfig()
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const deltaX = e.clientX - dragRef.current
@@ -83,12 +87,26 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </div>
 
                 <div className="flex items-center gap-3">
+                  {/* Image Configuration Toggle */}
+                  <LiquidButton
+                    onClick={() => setIsConfigOpen(!isConfigOpen)}
+                    variant="space"
+                    size="lg"
+                    className={`w-12 h-12 rounded-full flex items-center justify-center p-0 ${
+                      isConfigOpen ? 'ring-2 ring-purple-400' : ''
+                    }`}
+                  >
+                    <Settings className="w-6 h-6" />
+                  </LiquidButton>
+
                   {/* AI Assistant Toggle - Circular Button */}
                   <LiquidButton
                     onClick={() => setIsChatOpen(!isChatOpen)}
                     variant="space"
                     size="lg"
-                    className="w-12 h-12 rounded-full flex items-center justify-center p-0"
+                    className={`w-12 h-12 rounded-full flex items-center justify-center p-0 ${
+                      isChatOpen ? 'ring-2 ring-purple-400' : ''
+                    }`}
                   >
                     <Bot className="w-6 h-6" />
                   </LiquidButton>
@@ -106,6 +124,37 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </div>
           </main>
         </div>
+
+        {/* Image Configuration Overlay */}
+        {isConfigOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-start justify-center pt-20">
+            <div className="w-full max-w-md bg-black/90 backdrop-blur-md border border-purple-500/30 rounded-xl mx-4">
+              <div className="p-6 relative">
+                {/* Close button */}
+                <div className="absolute top-4 right-4 z-10">
+                  <LiquidButton
+                    onClick={() => setIsConfigOpen(false)}
+                    variant="space"
+                    size="sm"
+                    className="w-8 h-8 rounded-full flex items-center justify-center p-0"
+                  >
+                    ✕
+                  </LiquidButton>
+                </div>
+
+                <h3 className="text-lg font-bold text-white mb-4 purple-glow">
+                  🎨 Image Configuration
+                </h3>
+
+                <ImageConfigPanel
+                  config={config}
+                  onConfigChange={updateConfig}
+                  className=""
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mobile Chat Overlay */}
         {isChatOpen && (

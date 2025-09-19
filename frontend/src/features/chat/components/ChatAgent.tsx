@@ -10,6 +10,7 @@ import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
 import PromptsPanel from '@/components/ui/PromptsPanel'
 import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
+import ThinkingProcess from '@/components/ui/ThinkingProcess'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 
 interface ChatMessage {
@@ -17,6 +18,14 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  reasoning_details?: ReasoningStep[]
+  tool_used?: string
+  model?: string
+}
+
+interface ReasoningStep {
+  type: 'summary' | 'raw_text' | 'encrypted'
+  content: string
 }
 
 export default function ChatAgent() {
@@ -147,7 +156,10 @@ export default function ChatAgent() {
         id: `msg_${Date.now()}_assistant`,
         role: 'assistant',
         content: data.response || 'Sorry, I could not process your request.',
-        timestamp: new Date()
+        timestamp: new Date(),
+        reasoning_details: data.reasoning_details,
+        tool_used: data.tool_used,
+        model: data.model
       }
 
       addMessage(assistantMessage)
@@ -208,22 +220,37 @@ export default function ChatAgent() {
           </GlassCard>
         ) : (
           messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+            <div key={message.id} className="space-y-2">
               <div
-                className={`max-w-[80%] ${
-                  message.role === 'user'
-                    ? 'bg-purple-600/80 text-white rounded-l-lg rounded-tr-lg'
-                    : 'bg-black/60 text-purple-100 rounded-r-lg rounded-tl-lg border border-purple-500/30'
-                } backdrop-blur-sm p-3 shadow-lg`}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                <span className="text-xs opacity-60 mt-1 block">
-                  {message.timestamp.toLocaleTimeString()}
-                </span>
+                <div
+                  className={`max-w-[80%] ${
+                    message.role === 'user'
+                      ? 'bg-purple-600/80 text-white rounded-l-lg rounded-tr-lg'
+                      : 'bg-black/60 text-purple-100 rounded-r-lg rounded-tl-lg border border-purple-500/30'
+                  } backdrop-blur-sm p-3 shadow-lg`}
+                >
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <span className="text-xs opacity-60 mt-1 block">
+                    {message.timestamp.toLocaleTimeString()}
+                  </span>
+                </div>
               </div>
+
+              {/* Thinking Process for AI messages */}
+              {message.role === 'assistant' && (message.reasoning_details || message.tool_used) && (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%]">
+                    <ThinkingProcess
+                      reasoning_details={message.reasoning_details}
+                      tool_used={message.tool_used}
+                      model={message.model}
+                      selectedImagesCount={selectedImages.length}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}
@@ -241,12 +268,6 @@ export default function ChatAgent() {
         )}
       </div>
 
-      {/* Configuration Panel */}
-      <ImageConfigPanel
-        config={config}
-        onConfigChange={updateConfig}
-        className="mb-4"
-      />
 
       {/* Prompts Panel */}
       {showPrompts && (
