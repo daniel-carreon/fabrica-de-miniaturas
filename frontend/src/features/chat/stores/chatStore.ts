@@ -5,6 +5,9 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: Date
+  reasoning_details?: any[]
+  tool_used?: string
+  model?: string
 }
 
 interface ChatStore {

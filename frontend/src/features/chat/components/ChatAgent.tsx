@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useChatStore } from '../stores/chatStore'
+import { useChatStore, ChatMessage } from '../stores/chatStore'
 import { useImageStore } from '@/shared/stores/imageStore'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
 import { useImageConfig } from '@/shared/stores/imageConfigStore'
@@ -12,16 +12,6 @@ import PromptsPanel from '@/components/ui/PromptsPanel'
 import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
 import ThinkingProcess from '@/components/ui/ThinkingProcess'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-
-interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-  reasoning_details?: ReasoningStep[]
-  tool_used?: string
-  model?: string
-}
 
 interface ReasoningStep {
   type: 'summary' | 'raw_text' | 'encrypted'
