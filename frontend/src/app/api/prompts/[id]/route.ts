@@ -15,9 +15,10 @@ interface SavedPrompt {
 }
 
 // PUT - Update saved prompt
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params
+    const resolvedParams = await params
+    const { id } = resolvedParams
     const updates: SavedPrompt = await request.json()
 
     if (!id) {
@@ -30,9 +31,19 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     // Increment usage count if this is a "use" action
     const isUsageUpdate = Object.keys(updates).length === 0
     if (isUsageUpdate) {
+      // First get current count
+      const { data: current, error: fetchError } = await supabase
+        .from('saved_prompts')
+        .select('usage_count')
+        .eq('id', id)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      // Then update with incremented count
       const { data, error } = await supabase
         .from('saved_prompts')
-        .update({ usage_count: supabase.sql`usage_count + 1` })
+        .update({ usage_count: (current?.usage_count || 0) + 1 })
         .eq('id', id)
         .select()
         .single()
@@ -80,9 +91,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE - Delete saved prompt
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params
   try {
-    const { id } = params
+    const { id } = resolvedParams
 
     if (!id) {
       return NextResponse.json(

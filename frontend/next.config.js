@@ -16,10 +16,13 @@ const nextConfig = {
   },
   // Configuración para API routes que se comunicarán con el backend Python
   async rewrites() {
+    // Try to detect backend port dynamically
+    const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '8000'
+
     return [
       {
         source: '/api/backend/:path*',
-        destination: 'http://localhost:8000/:path*', // FastAPI backend
+        destination: `http://localhost:${backendPort}/:path*`, // Dynamic FastAPI backend
       },
     ];
   },

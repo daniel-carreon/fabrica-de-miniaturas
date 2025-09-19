@@ -4,9 +4,12 @@ import { useState } from 'react'
 import { useChatStore } from '../stores/chatStore'
 import { useImageStore } from '@/shared/stores/imageStore'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
+import { useImageConfig } from '@/shared/stores/imageConfigStore'
+import { backendFetch } from '@/shared/lib/portDetection'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
 import PromptsPanel from '@/components/ui/PromptsPanel'
+import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 
 interface ChatMessage {
@@ -29,6 +32,7 @@ export default function ChatAgent() {
 
   const { setGeneratedImages } = useImageStore()
   const { selectedImages, clearSelection, handleImageSelect } = useSelectedImages()
+  const { config, updateConfig, activePreset } = useImageConfig()
 
   const handleInjectPrompt = (prompt: string) => {
     setInput(prev => {
@@ -55,16 +59,21 @@ export default function ChatAgent() {
     try {
       console.log('🤖 Sending message to OpenRouter:', userMessage.content)
 
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const response = await backendFetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           message: userMessage.content,
           messages: messages, // Context history
-          selectedImages: selectedImages // Include selected images for combination tool
+          selectedImages: selectedImages, // Include selected images for combination tool
+          userConfig: config // Include user configuration for enhanced prompts
         }),
+      })
+
+      console.log('🎨 Using config:', {
+        preset: activePreset || 'custom',
+        consistency: config.character_consistency,
+        style: config.style_preset,
+        temperature: config.temperature
       })
 
       if (!response.ok) {
@@ -232,6 +241,19 @@ export default function ChatAgent() {
         )}
       </div>
 
+      {/* Configuration Panel */}
+      <ImageConfigPanel
+        config={config}
+        onConfigChange={updateConfig}
+        className="mb-4"
+      />
+
+      {/* Prompts Panel */}
+      {showPrompts && (
+        <div className="mb-4">
+          <PromptsPanel onInjectPrompt={handleInjectPrompt} />
+        </div>
+      )}
 
       {/* Input */}
       <GlassCard variant="dark" className="purple-glow">
@@ -272,9 +294,17 @@ export default function ChatAgent() {
             disabled={isLoading}
           />
           <div className="flex justify-between items-center">
-            <span className="text-xs text-purple-300">
-              Press Enter to send, Shift+Enter for new line
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPrompts(!showPrompts)}
+                className="text-xs text-purple-300 hover:text-purple-200 transition-colors"
+              >
+                💡 {showPrompts ? 'Hide' : 'Show'} Prompts
+              </button>
+              <span className="text-xs text-purple-300">
+                • Press Enter to send, Shift+Enter for new line
+              </span>
+            </div>
             <LiquidButton
               onClick={handleSend}
               disabled={isLoading || !input.trim()}

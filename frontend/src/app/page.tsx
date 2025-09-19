@@ -29,6 +29,7 @@ interface FavoriteImage {
   prompt: string
   saved_at: string
   created_at: string
+  model_version?: string
 }
 
 interface GeneratedImage {
@@ -77,7 +78,7 @@ export default function HomePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Image selection from context
-  const { selectedImages, handleImageSelect, isImageSelected, clearSelection, maxSelection } = useSelectedImages()
+  const { selectedImages, handleImageSelect, isImageSelected, isImageDisabled, clearSelection, maxSelection } = useSelectedImages()
 
   const {
     isGenerating,
@@ -95,7 +96,7 @@ export default function HomePage() {
       id: 'generated',
       label: 'Generated',
       icon: '⚡',
-      count: (Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.filter(img => !img.is_combined) : []).length,
+      count: (Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.filter(img => !img.is_combined) : []).length,
       color: 'from-purple-600 to-blue-600'
     },
     {
@@ -425,9 +426,8 @@ export default function HomePage() {
 
         // Delete from generated images in current session (with safety check)
         if (Array.isArray(generatedImages)) {
-          setGeneratedImages(prev =>
-            Array.isArray(prev) ? prev.filter(img => !selectedIds.includes(img.id)) : []
-          )
+          const filteredImages = generatedImages.filter(img => !selectedIds.includes(img.id))
+          setGeneratedImages(filteredImages)
         }
 
         // Delete from database for historical images
@@ -676,7 +676,8 @@ export default function HomePage() {
                         try {
                           const response = await fetch(`/api/generated?id=${image.id}`, { method: 'DELETE' })
                           if (response.ok) {
-                            setGeneratedImages(prev => prev.filter(img => img.id !== image.id))
+                            const filteredImages = generatedImages.filter(img => img.id !== image.id)
+                            setGeneratedImages(filteredImages)
                           }
                         } catch (error) {
                           console.error('Error deleting generated image:', error)
@@ -784,7 +785,8 @@ export default function HomePage() {
                       try {
                         const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
                         if (response.ok) {
-                          setGeneratedImages(prev => prev.filter(img => img.id !== id))
+                          const filteredImages = generatedImages.filter(img => img.id !== id)
+                          setGeneratedImages(filteredImages)
                         }
                       } catch (error) {
                         console.error('Error deleting combined image:', error)

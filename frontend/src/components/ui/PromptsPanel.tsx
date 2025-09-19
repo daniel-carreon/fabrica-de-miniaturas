@@ -457,7 +457,7 @@ export default function PromptsPanel({ onInjectPrompt }: PromptsPanelProps) {
               <div className="flex gap-3 pt-4">
                 <LiquidButton
                   onClick={() => setShowCreateModal(false)}
-                  variant="dark"
+                  variant="secondary"
                   className="flex-1"
                 >
                   Cancelar

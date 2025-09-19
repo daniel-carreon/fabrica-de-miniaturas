@@ -6,6 +6,7 @@ export interface GeneratedImage {
   prompt: string
   isSelected: boolean
   createdAt: Date
+  source?: 'flux_dani' | 'nano_banana'
 }
 
 export interface SavedImage {

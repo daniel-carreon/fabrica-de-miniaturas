@@ -7,7 +7,7 @@ import { Heart, Maximize2, Download, Trash2 } from 'lucide-react'
 interface ImageCardProps {
   id: string
   url: string
-  source: 'generated' | 'favorites' | 'uploads'
+  source: 'generated' | 'favorites' | 'uploads' | 'combined'
   prompt?: string
   metadata?: any
   onDelete?: (id: string) => void

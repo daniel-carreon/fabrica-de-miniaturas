@@ -5,9 +5,11 @@ Migrated from Next.js for better AI scalability
 import json
 import logging
 import time
+import asyncio
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
+from typing import Literal
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -24,10 +26,79 @@ class SelectedImage(BaseModel):
     url: str
     source: str
 
+class UserImageConfig(BaseModel):
+    """User configuration for image generation and combination"""
+
+    # Character Consistency Settings
+    character_consistency: Literal['strict', 'flexible', 'creative'] = Field(
+        default='flexible',
+        description="Level of character identity preservation"
+    )
+    dani_description: Optional[str] = Field(
+        default=None,
+        description="Custom description for DANI character consistency"
+    )
+    preserve_facial_features: bool = Field(
+        default=True,
+        description="Whether to explicitly preserve facial features"
+    )
+
+    # Visual Style Settings
+    style_preset: Literal['photorealistic', 'artistic', 'cinematic', 'portrait'] = Field(
+        default='photorealistic',
+        description="Overall visual style approach"
+    )
+    lighting_preference: Literal['studio', 'natural', 'dramatic', 'soft'] = Field(
+        default='studio',
+        description="Lighting style preference"
+    )
+    mood: Literal['professional', 'casual', 'dynamic', 'authoritative', 'friendly'] = Field(
+        default='professional',
+        description="Overall mood and tone"
+    )
+
+    # Technical Parameters
+    temperature: float = Field(
+        default=0.3,
+        ge=0.1,
+        le=1.0,
+        description="Creativity level (0.1=conservative, 1.0=creative)"
+    )
+    seed: Optional[int] = Field(
+        default=None,
+        description="Seed for reproducible results"
+    )
+
+    # Generation Preferences
+    image_quality: Literal['standard', 'high', 'ultra'] = Field(
+        default='high',
+        description="Output image quality level"
+    )
+    aspect_ratio: Literal['square', 'landscape', 'portrait', 'widescreen'] = Field(
+        default='landscape',
+        description="Preferred aspect ratio for generated images"
+    )
+
+    @validator('temperature')
+    def validate_temperature(cls, v):
+        if not 0.1 <= v <= 1.0:
+            raise ValueError('Temperature must be between 0.1 and 1.0')
+        return v
+
+    @validator('dani_description')
+    def validate_dani_description(cls, v):
+        if v and len(v) > 500:
+            raise ValueError('DANI description must be under 500 characters')
+        return v
+
 class ChatRequest(BaseModel):
     message: str
     messages: List[ChatMessage] = []
     selectedImages: List[SelectedImage] = []
+    userConfig: Optional[UserImageConfig] = Field(
+        default=None,
+        description="User configuration for image generation parameters"
+    )
 
 class ChatResponse(BaseModel):
     response: str
@@ -61,7 +132,7 @@ TOOLS = [
     "type": "function",
     "function": {
         "name": "combine_images",
-        "description": "Combine multiple existing images from the gallery using Nano Banana (Gemini 2.5 Flash). Can handle 2-8 images.",
+        "description": "Combine multiple existing images from the gallery using Nano Banana (Gemini 2.5 Flash). Can handle 2-8 images and generate multiple variations.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -73,7 +144,8 @@ TOOLS = [
                     "maxItems": 8
                 },
                 "prompt": {"type": "string", "description": "Instructions for how to combine the images"},
-                "output_name": {"type": "string", "description": "Name for the resulting combined image", "default": "combined_image"}
+                "num_variations": {"type": "integer", "minimum": 1, "maximum": 5, "default": 1, "description": "Number of different combination variations to generate"},
+                "output_name": {"type": "string", "description": "Name for the resulting combined images", "default": "combined_image"}
             },
             "required": ["image_urls", "prompt"]
         }
@@ -112,6 +184,11 @@ COMBINATION RULES (for combine_images):
 - Use ALL URLs from selectedImages array as image_urls parameter
 - Always ask for combination prompt (how to merge them)
 - Use descriptive output_name
+- BATCH VARIATIONS:
+  - "genera 5 variaciones" → num_variations: 5
+  - "varias versiones" → num_variations: 3
+  - "diferentes opciones" → num_variations: 3
+  - If not specified → num_variations: 1
 
 IMPORTANT: Keep prompts CONCISE (under 200 chars) to avoid GPU memory issues. Focus on key elements only.
 
@@ -120,6 +197,148 @@ EXAMPLES:
 "combina la primera y segunda imagen para hacer thumbnail" → CALL combine_images
 
 Temperature=0. Be 100% consistent."""
+
+class ImageParameterMapper:
+    """Converts user configuration to model-specific parameters"""
+
+    @staticmethod
+    def build_character_consistency_prompt(config: UserImageConfig, base_description: str = None) -> str:
+        """Build character consistency instructions based on user config"""
+        if not config:
+            return base_description or ""
+
+        # Get DANI description (custom or default)
+        dani_desc = config.dani_description or "elegant healthy man, robust build, authoritative gaze, AI leader"
+
+        # Build consistency instructions based on level
+        if config.character_consistency == 'strict':
+            consistency_instruction = f"PRESERVE CHARACTER IDENTITY: Maintain exactly these features: {dani_desc}. Keep facial structure, expression, and physical characteristics identical."
+        elif config.character_consistency == 'flexible':
+            consistency_instruction = f"MAINTAIN CHARACTER CORE: Keep the essence of this character: {dani_desc}. Allow minor variations while preserving key identity features."
+        else:  # creative
+            consistency_instruction = f"CREATIVE INTERPRETATION: Use this character as inspiration: {dani_desc}. Allow artistic interpretation while maintaining recognizable elements."
+
+        return consistency_instruction
+
+    @staticmethod
+    def build_style_instructions(config: UserImageConfig) -> str:
+        """Build style and mood instructions"""
+        if not config:
+            return "photorealistic style with professional lighting"
+
+        style_map = {
+            'photorealistic': "highly detailed photorealistic style, sharp focus, professional photography",
+            'artistic': "artistic interpretation, stylized rendering, creative visual approach",
+            'cinematic': "cinematic composition, dramatic lighting, movie-like quality",
+            'portrait': "portrait photography style, focused on facial features and expression"
+        }
+
+        lighting_map = {
+            'studio': "professional studio lighting, even illumination, soft shadows",
+            'natural': "natural lighting, realistic environmental illumination",
+            'dramatic': "dramatic lighting with strong contrasts, dynamic shadows",
+            'soft': "soft diffused lighting, gentle shadows, warm ambiance"
+        }
+
+        mood_map = {
+            'professional': "professional demeanor, confident and authoritative presence",
+            'casual': "relaxed and approachable, casual atmosphere",
+            'dynamic': "energetic and dynamic, action-oriented composition",
+            'authoritative': "commanding presence, leadership qualities emphasized",
+            'friendly': "warm and approachable, friendly expression"
+        }
+
+        instructions = [
+            style_map.get(config.style_preset, style_map['photorealistic']),
+            lighting_map.get(config.lighting_preference, lighting_map['studio']),
+            mood_map.get(config.mood, mood_map['professional'])
+        ]
+
+        return ", ".join(instructions)
+
+    @staticmethod
+    def build_nano_banana_parameters(config: UserImageConfig) -> Dict[str, Any]:
+        """Convert user config to Nano Banana API parameters"""
+        if not config:
+            return {"temperature": 0.3}
+
+        params = {
+            "temperature": config.temperature,
+            "max_tokens": 1500,
+        }
+
+        # Add seed if specified
+        if config.seed:
+            params["seed"] = config.seed
+
+        return params
+
+    @staticmethod
+    def build_enhanced_prompt(base_prompt: str, config: UserImageConfig, selected_images: List[SelectedImage] = None) -> str:
+        """Build enhanced prompt combining base prompt with user configuration"""
+        if not config:
+            return base_prompt
+
+        # Start with base prompt
+        enhanced_parts = [base_prompt]
+
+        # Add character consistency if relevant (check for DANI or if images selected)
+        if "DANI" in base_prompt.upper() or (selected_images and any("dani" in img.source.lower() for img in selected_images)):
+            character_instruction = ImageParameterMapper.build_character_consistency_prompt(config)
+            enhanced_parts.append(character_instruction)
+
+        # Add style instructions
+        style_instruction = ImageParameterMapper.build_style_instructions(config)
+        enhanced_parts.append(style_instruction)
+
+        # Add facial feature preservation if enabled
+        if config.preserve_facial_features:
+            enhanced_parts.append("Preserve facial features and expressions accurately")
+
+        # Join with proper punctuation
+        enhanced_prompt = ". ".join(enhanced_parts)
+
+        # Ensure proper ending
+        if not enhanced_prompt.endswith('.'):
+            enhanced_prompt += '.'
+
+        return enhanced_prompt
+
+async def translate_to_english(text: str) -> str:
+    """Translate Spanish text to English using GPT-5-mini"""
+    # Simple detection - if contains Spanish words, translate
+    spanish_indicators = ['imagen', 'imagenes', 'genera', 'generame', 'combina', 'mezcla', 'fusiona', 'miniatura', 'fondo', 'texto', 'estilo', 'con', 'para', 'que', 'una', 'unas', 'estas', 'este']
+
+    if any(word in text.lower() for word in spanish_indicators):
+        logger.info(f"🌍 Detected Spanish, translating: '{text[:50]}...'")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': FRONTEND_URL,
+                    'X-Title': 'Daniel Flux Context - Translator'
+                },
+                json={
+                    "model": "gpt-5-mini",
+                    "messages": [
+                        {"role": "system", "content": "Translate the following Spanish text to English. Keep technical terms, names, and specific instructions intact. Only return the translation, no explanations."},
+                        {"role": "user", "content": text}
+                    ],
+                    "max_tokens": 500,
+                    "temperature": 0.1
+                },
+                timeout=30.0
+            )
+            response.raise_for_status()
+            result = response.json()
+            translated = result.get("choices", [{}])[0].get("message", {}).get("content", text)
+            logger.info(f"✅ Translated to: '{translated[:50]}...'")
+            return translated.strip()
+
+    return text
 
 async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
     """Call OpenRouter API"""
@@ -146,15 +365,25 @@ async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
         response.raise_for_status()
         return response.json()
 
-async def call_generate_api(prompt: str, num_images: int = 3) -> Dict[str, Any]:
-    """Call frontend generate API with enhanced DANI description"""
-    # DANI character description - optimized short version
-    dani_description = "hombre saludable, corpulento, elegante, mirada autoritaria, líder IA, 8K"
+async def call_generate_api(prompt: str, num_images: int = 3, user_config: UserImageConfig = None, selected_images: List[SelectedImage] = None) -> Dict[str, Any]:
+    """Call frontend generate API with enhanced DANI description and user configuration"""
+    # Translate Spanish to English first
+    english_prompt = await translate_to_english(prompt)
 
-    # Enhance prompt with DANI description if DANI is mentioned
-    enhanced_prompt = prompt
-    if "DANI" in prompt.upper():
-        enhanced_prompt = f"{prompt} ({dani_description})"
+    # Build enhanced prompt using user configuration
+    if user_config:
+        enhanced_prompt = ImageParameterMapper.build_enhanced_prompt(
+            english_prompt,
+            user_config,
+            selected_images
+        )
+        logger.info(f"🎨 Using user config: {user_config.style_preset}, consistency: {user_config.character_consistency}")
+    else:
+        # Fallback to original logic for backwards compatibility
+        dani_description = "elegant healthy man, robust build, authoritative gaze, AI leader, 8K"
+        enhanced_prompt = english_prompt
+        if "DANI" in english_prompt.upper():
+            enhanced_prompt = f"{english_prompt} ({dani_description})"
 
     logger.info(f"🚀 Calling Replicate with enhanced prompt: '{enhanced_prompt[:100]}...' and {num_images} images")
 
@@ -189,8 +418,74 @@ async def call_generate_api(prompt: str, num_images: int = 3) -> Dict[str, Any]:
         logger.error(f"💥 Exception type: {type(e)}")
         raise
 
-async def call_combine_images_api_multi(image_urls: List[str], prompt: str, output_name: str = "combined_image") -> Dict[str, Any]:
-    """Combine multiple images using Gemini 2.5 Flash (Nano Banana) via OpenRouter"""
+async def call_combine_images_api_batch(image_urls: List[str], prompt: str, num_variations: int = 1, output_name: str = "combined_image", user_config: UserImageConfig = None, selected_images: List[SelectedImage] = None) -> Dict[str, Any]:
+    """Combine multiple images with batch processing - generates multiple variations"""
+    logger.info(f"🔄 Batch combining {len(image_urls)} images with {num_variations} variations: '{prompt[:100]}...'")
+
+    all_images = []
+
+    for i in range(num_variations):
+        try:
+            logger.info(f"🎨 Processing variation {i+1}/{num_variations}")
+
+            # Create variation prompt with subtle differences
+            variation_prompts = [
+                f"{prompt}",
+                f"{prompt}, artistic style",
+                f"{prompt}, dynamic composition",
+                f"{prompt}, enhanced lighting",
+                f"{prompt}, creative blend"
+            ]
+
+            variation_prompt = variation_prompts[i % len(variation_prompts)]
+            variation_name = f"{output_name}_v{i+1}"
+
+            # Call the single combine function
+            result = await call_combine_images_api_single(
+                image_urls,
+                variation_prompt,
+                variation_name,
+                user_config,
+                selected_images
+            )
+
+            # Add variation number to each image
+            if result.get("images"):
+                for img in result["images"]:
+                    img["variation"] = i + 1
+                    img["id"] = f"combined_{int(time.time())}_{i+1}"
+
+                all_images.extend(result["images"])
+                logger.info(f"✅ Variation {i+1} succeeded: {len(result['images'])} images")
+            else:
+                logger.warning(f"⚠️ Variation {i+1}: No images in result")
+
+            # Small delay between calls to respect rate limits
+            if i < num_variations - 1:
+                await asyncio.sleep(2)  # Increased delay to 2 seconds
+
+        except Exception as e:
+            logger.error(f"💥 Variation {i+1} failed: {str(e)}")
+            # Continue with next variation instead of stopping
+            continue
+
+    # Ensure we have at least some results
+    if len(all_images) == 0:
+        raise ValueError(f"All {num_variations} variations failed to generate images")
+
+    logger.info(f"🎉 Batch processing completed: {len(all_images)}/{num_variations} variations succeeded")
+
+    return {
+        "images": all_images,
+        "total": len(all_images),
+        "prompt": prompt,
+        "variations": num_variations,
+        "successful_variations": len(all_images),
+        "tool": "nano_banana_batch"
+    }
+
+async def call_combine_images_api_single(image_urls: List[str], prompt: str, output_name: str = "combined_image", user_config: UserImageConfig = None, selected_images: List[SelectedImage] = None) -> Dict[str, Any]:
+    """Combine multiple images using Gemini 2.5 Flash (Nano Banana) via OpenRouter - Single variation"""
     logger.info(f"🔄 Combining {len(image_urls)} images with Nano Banana: '{prompt[:100]}...'")
 
     try:
@@ -209,8 +504,24 @@ async def call_combine_images_api_multi(image_urls: List[str], prompt: str, outp
                 img_b64 = base64.b64encode(img_response.content).decode('utf-8')
                 images_b64.append(img_b64)
 
+            # Translate Spanish to English first
+            english_prompt = await translate_to_english(prompt)
+
+            # Build enhanced prompt using user configuration
+            if user_config:
+                enhanced_base = ImageParameterMapper.build_enhanced_prompt(
+                    english_prompt,
+                    user_config,
+                    selected_images
+                )
+                logger.info(f"🎨 Nano Banana using config: {user_config.style_preset}, temp: {user_config.temperature}")
+            else:
+                enhanced_base = english_prompt
+
             # Call OpenRouter with Gemini 2.5 Flash Image
-            content = [{"type": "text", "text": f"Combine these {len(image_urls)} images as follows: {prompt}"}]
+            # Enhanced prompt to ensure image generation
+            enhanced_prompt = f"CREATE AND GENERATE a new combined image by merging these {len(image_urls)} images. Instructions: {enhanced_base}. IMPORTANT: You must generate and return a visual image, not just text description."
+            content = [{"type": "text", "text": enhanced_prompt}]
 
             # Add all images to content
             for i, img_b64 in enumerate(images_b64, 1):
@@ -218,6 +529,9 @@ async def call_combine_images_api_multi(image_urls: List[str], prompt: str, outp
                     "type": "image_url",
                     "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
                 })
+
+            # Build API parameters using user configuration
+            api_params = ImageParameterMapper.build_nano_banana_parameters(user_config) if user_config else {"temperature": 0.3}
 
             combine_payload = {
                 "model": "google/gemini-2.5-flash-image-preview",
@@ -228,8 +542,11 @@ async def call_combine_images_api_multi(image_urls: List[str], prompt: str, outp
                     }
                 ],
                 "modalities": ["image", "text"],
-                "max_tokens": 1500
+                **api_params  # Spread user config parameters
             }
+
+            if user_config:
+                logger.info(f"🔧 Using API params: {api_params}")
 
             logger.info(f"🚀 Calling Nano Banana for image combination...")
 
@@ -263,27 +580,37 @@ async def call_combine_images_api_multi(image_urls: List[str], prompt: str, outp
                 logger.info(f"🔍 Debug - Message received with keys: {list(message.keys())}")
 
                 # Check if there are images in the response
+                combined_url = None
+
                 if message.get("images"):
                     logger.info(f"🔍 Debug - Found images in message.images")
                     combined_image_data = message["images"][0]
                     combined_url = combined_image_data.get("image_url", {}).get("url")
                 elif message.get("content"):
-                    logger.info(f"🔍 Debug - Checking message.content for images: {message['content']}")
-                    # Gemini might return images in content array
                     content = message["content"]
+                    logger.info(f"🔍 Debug - Content type: {type(content)}")
+
                     if isinstance(content, list):
-                        for item in content:
+                        logger.info(f"🔍 Debug - Content is array with {len(content)} items")
+                        for i, item in enumerate(content):
+                            logger.info(f"🔍 Debug - Item {i}: type={item.get('type')}")
                             if item.get("type") == "image":
                                 logger.info(f"🔍 Debug - Found image in content array")
                                 combined_url = item.get("source", {}).get("url") or item.get("image_url", {}).get("url")
                                 break
-                        else:
-                            raise ValueError("No image found in content array")
+                    elif isinstance(content, str):
+                        logger.warning(f"🔍 Debug - Content is text only: {content[:100]}...")
+                        # Gemini returned only text, no image generated
+                        raise ValueError(f"Nano Banana returned text only, no image generated: {content[:200]}...")
                     else:
-                        raise ValueError("Content is not array format")
+                        logger.error(f"🔍 Debug - Unexpected content format: {type(content)}")
+                        raise ValueError(f"Unexpected content format: {type(content)}")
                 else:
-                    logger.error(f"🔍 Debug - No images found. Message keys: {list(message.keys())}")
-                    raise ValueError("No images found in response")
+                    logger.error(f"🔍 Debug - No content or images found. Message keys: {list(message.keys())}")
+                    raise ValueError("No content or images found in response")
+
+                if not combined_url:
+                    raise ValueError("No image URL found in response")
 
                 return {
                     "images": [{
@@ -305,10 +632,18 @@ async def call_combine_images_api_multi(image_urls: List[str], prompt: str, outp
         logger.error(f"💥 Exception type: {type(e)}")
         raise
 
+# Main multi-image function with batch support
+async def call_combine_images_api_multi(image_urls: List[str], prompt: str, num_variations: int = 1, output_name: str = "combined_image", user_config: UserImageConfig = None, selected_images: List[SelectedImage] = None) -> Dict[str, Any]:
+    """Multi-image combine function with batch processing support"""
+    if num_variations > 1:
+        return await call_combine_images_api_batch(image_urls, prompt, num_variations, output_name, user_config, selected_images)
+    else:
+        return await call_combine_images_api_single(image_urls, prompt, output_name, user_config, selected_images)
+
 # Backward compatibility function - calls the new multi-image function
 async def call_combine_images_api(image1_url: str, image2_url: str, prompt: str, output_name: str = "combined_image") -> Dict[str, Any]:
     """Backward compatibility wrapper for combine_images_api_multi"""
-    return await call_combine_images_api_multi([image1_url, image2_url], prompt, output_name)
+    return await call_combine_images_api_multi([image1_url, image2_url], prompt, 1, output_name)
 
 def extract_prompt_fallback(json_str: str) -> Dict[str, Any]:
     """Extract prompt from malformed JSON with improved handling"""
@@ -343,6 +678,23 @@ async def chat_endpoint(request: ChatRequest):
     try:
         # Build system prompt with selected images context
         system_content = SYSTEM_PROMPT
+
+        # Add user configuration context if provided
+        if request.userConfig:
+            config_context = f"\n\nUSER IMAGE CONFIGURATION:\n"
+            config_context += f"- Character Consistency: {request.userConfig.character_consistency}\n"
+            config_context += f"- Style Preset: {request.userConfig.style_preset}\n"
+            config_context += f"- Lighting Preference: {request.userConfig.lighting_preference}\n"
+            config_context += f"- Mood: {request.userConfig.mood}\n"
+            config_context += f"- Temperature: {request.userConfig.temperature}\n"
+            config_context += f"- Preserve Facial Features: {request.userConfig.preserve_facial_features}\n"
+
+            if request.userConfig.dani_description:
+                config_context += f"- Custom DANI Description: {request.userConfig.dani_description}\n"
+
+            config_context += "\nIMPORTANT: Use these preferences when calling image generation tools. "
+            config_context += "Apply the specified character consistency level, style, and mood to enhance prompts appropriately."
+            system_content += config_context
 
         if request.selectedImages:
             images_context = f"\n\nSELECTED IMAGES CONTEXT ({len(request.selectedImages)} images):\n"
@@ -383,8 +735,13 @@ async def chat_endpoint(request: ChatRequest):
                         args = extract_prompt_fallback(raw_args)
                         logger.info(f"✅ Fallback extraction successful: {args}")
 
-                    # Generate images
-                    result = await call_generate_api(args["prompt"], args.get("numImages", 3))
+                    # Generate images with user configuration
+                    result = await call_generate_api(
+                        args["prompt"],
+                        args.get("numImages", 3),
+                        request.userConfig,
+                        request.selectedImages
+                    )
 
                     return ChatResponse(
                         response=f"✨ Generated {result['total']} images with DANI prompt '{args['prompt'][:100]}...' Check the gallery! 🎨",
@@ -411,14 +768,18 @@ async def chat_endpoint(request: ChatRequest):
                         args = extract_prompt_fallback(raw_args)
                         logger.info(f"✅ Combine fallback extraction successful: {args}")
 
-                    # Combine images using Nano Banana
+                    # Combine images using Nano Banana with user configuration
                     # Check if using new multi-image format or old format
                     if "image_urls" in args:
-                        logger.info(f"🔄 Using multi-image format with {len(args['image_urls'])} images")
+                        num_variations = args.get("num_variations", 1)
+                        logger.info(f"🔄 Using multi-image format with {len(args['image_urls'])} images, {num_variations} variations")
                         result = await call_combine_images_api_multi(
                             args["image_urls"],
                             args["prompt"],
-                            args.get("output_name", "combined_image")
+                            num_variations,
+                            args.get("output_name", "combined_image"),
+                            request.userConfig,
+                            request.selectedImages
                         )
                     else:
                         logger.info(f"🔄 Using legacy 2-image format")
@@ -429,8 +790,13 @@ async def chat_endpoint(request: ChatRequest):
                             args.get("output_name", "combined_image")
                         )
 
+                    # Create response based on variations
+                    variations_text = ""
+                    if num_variations > 1:
+                        variations_text = f" ({num_variations} variations)"
+
                     return ChatResponse(
-                        response=f"🔄 Combined images successfully! '{args['prompt'][:100]}...' Check the gallery! ✨",
+                        response=f"🔄 Combined {len(args['image_urls'])} images successfully{variations_text}! '{args['prompt'][:100]}...' Check the gallery! ✨",
                         tool_used="combine_images",
                         tool_result=result,
                         usage=data.get("usage"),
