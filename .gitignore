@@ -121,3 +121,4 @@ backend/migrations/versions/*
 
 # Jupyter Notebooks
 .ipynb_checkpoints
+.vercel
