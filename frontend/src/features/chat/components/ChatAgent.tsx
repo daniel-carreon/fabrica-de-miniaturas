@@ -181,17 +181,20 @@ export default function ChatAgent() {
       <GlassCard variant="dark" className="purple-glow mb-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-white">🤖 AI Assistant</h2>
-            <p className="text-sm text-purple-200">Powered by OpenRouter</p>
+            <h2 className="text-lg md:text-xl font-bold text-white">🤖 AI Assistant</h2>
+            <p className="text-xs md:text-sm text-purple-200 hidden sm:block">Powered by OpenRouter</p>
           </div>
-          <LiquidButton
-            onClick={clearMessages}
-            variant="space"
-            size="sm"
-            className="text-xs"
-          >
-            🗑️ Clear
-          </LiquidButton>
+          {/* Clear button only on desktop */}
+          <div className="hidden md:block">
+            <LiquidButton
+              onClick={clearMessages}
+              variant="space"
+              size="sm"
+              className="text-xs"
+            >
+              🗑️ Clear
+            </LiquidButton>
+          </div>
         </div>
       </GlassCard>
 
@@ -312,7 +315,7 @@ export default function ChatAgent() {
               >
                 💡 {showPrompts ? 'Hide' : 'Show'} Prompts
               </button>
-              <span className="text-xs text-purple-300">
+              <span className="text-xs text-purple-300 hidden sm:inline">
                 • Press Enter to send, Shift+Enter for new line
               </span>
             </div>
@@ -323,7 +326,7 @@ export default function ChatAgent() {
               size="sm"
               className="disabled:opacity-50"
             >
-              {isLoading ? '⏳' : '🚀'} Send
+              {isLoading ? '⏳' : '🚀'} <span className="hidden sm:inline">Send</span>
             </LiquidButton>
           </div>
         </div>

@@ -108,9 +108,18 @@ class ChatResponse(BaseModel):
     model: Optional[str] = None
     reasoning_details: Optional[List[Dict[str, Any]]] = None
 
-# OpenRouter config
-OPENROUTER_API_KEY = "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"
-FRONTEND_URL = "http://localhost:3000"
+# OpenRouter config from environment variables
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+FRONTEND_URL = "http://localhost:3000"  # Ensure this matches your frontend port
+
+if not OPENROUTER_API_KEY:
+    raise ValueError("OPENROUTER_API_KEY environment variable is required")
 
 # Tool definition
 TOOLS = [
@@ -335,7 +344,7 @@ async def translate_to_english(text: str) -> str:
                     'X-Title': 'Daniel Flux Context - Translator'
                 },
                 json={
-                    "model": "openai/gpt-5",
+                    "model": "openai/gpt-4o",  # Using stable model instead of gpt-5
                     "messages": [
                         {"role": "system", "content": "Translate the following Spanish text to English. Keep technical terms, names, and specific instructions intact. Only return the translation, no explanations."},
                         {"role": "user", "content": text}
@@ -354,18 +363,13 @@ async def translate_to_english(text: str) -> str:
     return text
 
 async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
-    """Call OpenRouter API"""
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': FRONTEND_URL,
-                'X-Title': 'Daniel Flux Context'
-            },
-            json={
-                "model": "openai/gpt-5",
+    """Call OpenRouter API with robust error handling"""
+    try:
+        logger.info(f"🚀 Calling OpenRouter with {len(messages)} messages")
+
+        async with httpx.AsyncClient() as client:
+            payload = {
+                "model": "openai/gpt-4o",  # Using stable model instead of gpt-5
                 "messages": messages,
                 "tools": TOOLS,
                 "tool_choice": "auto",
@@ -377,11 +381,42 @@ async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
                 },
                 "temperature": 0.1,
                 "top_p": 0.5
-            },
-            timeout=60.0
-        )
-        response.raise_for_status()
-        return response.json()
+            }
+
+            logger.info(f"📤 OpenRouter payload: model={payload['model']}, messages={len(payload['messages'])}, tools={len(payload['tools'])}")
+
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': FRONTEND_URL,
+                    'X-Title': 'Daniel Flux Context'
+                },
+                json=payload,
+                timeout=60.0
+            )
+
+            logger.info(f"📥 OpenRouter response: status={response.status_code}")
+
+            if response.status_code != 200:
+                error_text = response.text
+                logger.error(f"❌ OpenRouter error {response.status_code}: {error_text}")
+                raise HTTPException(status_code=response.status_code, detail=f"OpenRouter API error: {error_text}")
+
+            result = response.json()
+            logger.info(f"✅ OpenRouter success: {list(result.keys())}")
+            return result
+
+    except httpx.TimeoutException:
+        logger.error("⏰ OpenRouter timeout")
+        raise HTTPException(status_code=408, detail="OpenRouter API timeout")
+    except httpx.RequestError as e:
+        logger.error(f"🌐 OpenRouter connection error: {e}")
+        raise HTTPException(status_code=503, detail=f"OpenRouter connection error: {str(e)}")
+    except Exception as e:
+        logger.error(f"💥 OpenRouter unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=f"OpenRouter error: {str(e)}")
 
 async def call_generate_api(prompt: str, num_images: int = 3, user_config: UserImageConfig = None, selected_images: List[SelectedImage] = None) -> Dict[str, Any]:
     """Call frontend generate API with enhanced DANI description and user configuration"""
@@ -704,6 +739,10 @@ def extract_prompt_fallback(json_str: str) -> Dict[str, Any]:
 async def chat_endpoint(request: ChatRequest):
     """Chat endpoint with AI agent and tool calling"""
     try:
+        logger.info(f"💬 Chat request received: message='{request.message[:100]}...'")
+        logger.info(f"📝 Context: {len(request.messages)} history messages, {len(request.selectedImages) if request.selectedImages else 0} selected images")
+        logger.info(f"⚙️ User config provided: {request.userConfig is not None}")
+
         # Build system prompt with selected images context
         system_content = SYSTEM_PROMPT
 
@@ -889,9 +928,14 @@ async def chat_endpoint(request: ChatRequest):
             reasoning_details=reasoning_details
         )
 
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        logger.error(f"Chat error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"💥 Unexpected chat error: {e}")
+        logger.error(f"💥 Error type: {type(e)}")
+        logger.error(f"💥 Request details: message='{request.message[:50]}...', selectedImages={len(request.selectedImages) if request.selectedImages else 0}")
+        raise HTTPException(status_code=500, detail=f"Chat processing error: {str(e)}")
 
 @router.get("/chat/health")
 async def health():

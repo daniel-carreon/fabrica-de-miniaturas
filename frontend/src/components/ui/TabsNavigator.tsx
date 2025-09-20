@@ -34,7 +34,7 @@ export default function TabsNavigator({ tabs, activeTab, onTabChange, className 
               onMouseEnter={() => setHoveredTab(tab.id)}
               onMouseLeave={() => setHoveredTab(null)}
               className={`
-                relative flex items-center gap-2 px-4 py-3 rounded-lg transition-all duration-300 min-w-fit whitespace-nowrap
+                relative flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 md:py-3 rounded-lg transition-all duration-300 min-w-fit whitespace-nowrap
                 ${isActive
                   ? `bg-gradient-to-r ${tab.color} text-white shadow-lg transform scale-105`
                   : isHovered
@@ -49,11 +49,11 @@ export default function TabsNavigator({ tabs, activeTab, onTabChange, className 
               )}
 
               {/* Content */}
-              <div className="relative flex items-center gap-2">
-                <span className="text-lg">{tab.icon}</span>
-                <span className="font-medium text-sm">{tab.label}</span>
+              <div className="relative flex items-center gap-1 md:gap-2">
+                <span className="text-base md:text-lg">{tab.icon}</span>
+                <span className="font-medium text-xs md:text-sm hidden sm:inline">{tab.label}</span>
                 <div className={`
-                  px-2 py-1 rounded-full text-xs font-bold min-w-[20px] text-center
+                  px-1.5 md:px-2 py-0.5 md:py-1 rounded-full text-xs font-bold min-w-[16px] md:min-w-[20px] text-center
                   ${isActive
                     ? 'bg-white/20 text-white'
                     : 'bg-gray-700 text-gray-300'

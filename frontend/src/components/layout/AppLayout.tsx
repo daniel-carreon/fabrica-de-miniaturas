@@ -22,6 +22,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const dragRef = useRef<number>(0)
   const { config, updateConfig } = useImageConfig()
 
+  // Mobile navigation state
+  const [mobileView, setMobileView] = useState<'dashboard' | 'chat'>('dashboard')
+
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const deltaX = e.clientX - dragRef.current
     setChatWidth(prevWidth => {
@@ -75,41 +78,65 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <div className="flex-1 flex flex-col">
           {/* Header with Chat Toggle */}
           <header className="border-b border-white/10 bg-black/20 backdrop-blur-md shrink-0">
-            <div className="px-4 py-6">
+            <div className="px-4 py-3 md:py-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold text-white purple-glow">
+                <div className="flex-1">
+                  <h1 className="text-xl md:text-3xl font-bold text-white purple-glow">
                     🎯 Daniel Flux Context
                   </h1>
-                  <p className="text-sm text-purple-200 mt-1">
+                  <p className="text-xs md:text-sm text-purple-200 mt-1 hidden sm:block">
                     AI-powered image generation for YouTube thumbnails
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 md:gap-3">
                   {/* Image Configuration Toggle */}
                   <LiquidButton
                     onClick={() => setIsConfigOpen(!isConfigOpen)}
                     variant="space"
                     size="lg"
-                    className={`w-12 h-12 rounded-full flex items-center justify-center p-0 ${
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center p-0 ${
                       isConfigOpen ? 'ring-2 ring-purple-400' : ''
                     }`}
                   >
-                    <Settings className="w-6 h-6" />
+                    <Settings className="w-5 h-5 md:w-6 md:h-6" />
                   </LiquidButton>
 
-                  {/* AI Assistant Toggle - Circular Button */}
-                  <LiquidButton
-                    onClick={() => setIsChatOpen(!isChatOpen)}
-                    variant="space"
-                    size="lg"
-                    className={`w-12 h-12 rounded-full flex items-center justify-center p-0 ${
-                      isChatOpen ? 'ring-2 ring-purple-400' : ''
-                    }`}
-                  >
-                    <Bot className="w-6 h-6" />
-                  </LiquidButton>
+                  {/* Tablet/Mobile Toggle Button - Shows different icon based on current view */}
+                  <div className="lg:hidden">
+                    <LiquidButton
+                      onClick={() => {
+                        const newView = mobileView === 'dashboard' ? 'chat' : 'dashboard'
+                        setMobileView(newView)
+                        setIsChatOpen(newView === 'chat')
+                      }}
+                      variant="space"
+                      size="lg"
+                      className={`w-10 h-10 rounded-full flex items-center justify-center p-0 ${
+                        mobileView === 'chat' ? 'ring-2 ring-purple-400' : ''
+                      }`}
+                    >
+                      {mobileView === 'dashboard' ? (
+                        <Bot className="w-5 h-5" />
+                      ) : (
+                        <span className="text-sm font-bold">📊</span>
+                      )}
+                    </LiquidButton>
+                  </div>
+
+                  {/* Desktop AI Assistant Toggle - Hidden on tablet/mobile */}
+                  <div className="hidden lg:block">
+                    <LiquidButton
+                      onClick={() => setIsChatOpen(!isChatOpen)}
+                      variant="space"
+                      size="lg"
+                      className={`w-12 h-12 rounded-full flex items-center justify-center p-0 ${
+                        isChatOpen ? 'ring-2 ring-purple-400' : ''
+                      }`}
+                    >
+                      <Bot className="w-6 h-6" />
+                    </LiquidButton>
+                  </div>
                 </div>
               </div>
             </div>
@@ -156,26 +183,54 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         )}
 
-        {/* Mobile Chat Overlay */}
-        {isChatOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 md:hidden">
-            <div className="h-full w-full max-w-sm bg-black/90 backdrop-blur-md border-r border-purple-500/20">
-              <div className="p-4 h-full relative">
-                {/* Close button for mobile */}
-                <div className="absolute top-4 right-4 z-10">
-                  <LiquidButton
-                    onClick={() => setIsChatOpen(false)}
-                    variant="space"
-                    size="sm"
-                  >
-                    ✕
-                  </LiquidButton>
+        {/* Tablet/Mobile Full Screen View */}
+        <div className="lg:hidden">
+          {mobileView === 'chat' && (
+            <div className="fixed inset-0 bg-black z-50">
+              <div className="h-full w-full bg-black">
+                {/* Mobile Chat Header with Controls */}
+                <div className="flex items-center justify-between p-4 border-b border-purple-500/20">
+                  <h1 className="text-lg font-bold text-white purple-glow">
+                    🤖 AI Assistant
+                  </h1>
+                  <div className="flex items-center gap-2">
+                    {/* Configuration Button */}
+                    <LiquidButton
+                      onClick={() => setIsConfigOpen(!isConfigOpen)}
+                      variant="space"
+                      size="sm"
+                      className={`w-10 h-10 rounded-full flex items-center justify-center p-0 ${
+                        isConfigOpen ? 'ring-2 ring-purple-400' : ''
+                      }`}
+                    >
+                      <Settings className="w-5 h-5" />
+                    </LiquidButton>
+
+                    {/* Back to Dashboard Button */}
+                    <LiquidButton
+                      onClick={() => {
+                        setMobileView('dashboard')
+                        setIsChatOpen(false)
+                      }}
+                      variant="space"
+                      size="sm"
+                      className="w-10 h-10 rounded-full flex items-center justify-center p-0"
+                    >
+                      <span className="text-sm font-bold">📊</span>
+                    </LiquidButton>
+                  </div>
                 </div>
-                <ChatAgent />
+
+                {/* Chat Content */}
+                <div className="h-full pb-16 overflow-hidden">
+                  <div className="p-4 h-full">
+                    <ChatAgent />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </SelectedImagesProvider>
   )
