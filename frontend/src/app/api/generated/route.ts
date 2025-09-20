@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { processImagesToWebPStorage } from '../../../shared/lib/immediate-webp-storage'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,12 +17,11 @@ interface SaveGeneratedRequest {
   modelVersion?: string
   modelParameters?: object
   generationSession?: string
-  toolUsed?: 'generate_images' | 'combine_images'
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { images, modelVersion, modelParameters, generationSession, toolUsed }: SaveGeneratedRequest = await request.json()
+    const { images, modelVersion, modelParameters, generationSession }: SaveGeneratedRequest = await request.json()
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json(
@@ -30,35 +30,83 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('💾 Auto-saving generated images:', images.length)
+    console.log('💾 Auto-saving generated images with IMMEDIATE WebP storage:', images.length)
 
-    // Prepare data for batch insert
-    const imageData = images.map(image => ({
-      image_id: image.id,
-      replicate_url: image.url,
-      prompt: image.prompt,
-      model_version: modelVersion || null,
-      model_parameters: modelParameters || {},
-      generation_session: generationSession || `session_${Date.now()}`,
-      generated_at: new Date(image.timestamp).toISOString(),
-      tags: [], // Default empty tags
-      quality_score: null, // To be computed later
-      is_combined: toolUsed === 'combine_images', // Mark combined images correctly
-      parent_images: [] // Empty for original generations
-    }))
+    // 🚀 NUEVA ESTRATEGIA: Immediate WebP + Supabase Storage
+    try {
+      console.log('🎨 Processing images to WebP storage immediately...')
 
-    // Batch insert to database
-    const { data: savedImages, error: dbError } = await supabase
-      .from('generated_images')
-      .insert(imageData)
-      .select()
+      const processedImages = await processImagesToWebPStorage(images, {
+        type: 'generated',
+        metadata: {
+          modelVersion: modelVersion || undefined,
+          session: generationSession || `session_${Date.now()}`
+        }
+      })
 
-    if (dbError) {
-      console.error('❌ Database error:', dbError)
-      throw new Error(`Database save failed: ${dbError.message}`)
+      console.log(`✅ WebP processing completed: ${processedImages.length}/${images.length} images`)
+
+      // Prepare data for batch insert with SUPABASE URLs (not temporary URLs)
+      const imageData = processedImages.map(processedImage => ({
+        image_id: processedImage.id,
+        replicate_url: processedImage.original_url, // Keep for reference
+        supabase_url: processedImage.supabase_url,  // PERMANENT URL
+        prompt: processedImage.prompt,
+        model_version: modelVersion || null,
+        model_parameters: modelParameters || {},
+        generation_session: generationSession || `session_${Date.now()}`,
+        generated_at: new Date().toISOString(),
+        tags: [],
+        quality_score: null,
+        webp_optimized: true, // ✅ ALREADY OPTIMIZED
+        storage_folder: 'generated/'
+      }))
+
+      // Batch insert to generated_images table
+      const { data: savedImages, error: dbError } = await supabase
+        .from('generated_images')
+        .insert(imageData)
+        .select()
+
+      if (dbError) {
+        console.error('❌ Database error:', dbError)
+        throw new Error(`Database save failed: ${dbError.message}`)
+      }
+
+      console.log('✅ Successfully auto-saved generated images with WebP optimization:', savedImages?.length)
+
+    } catch (processError) {
+      console.error('❌ WebP processing failed:', processError)
+
+      // Fallback: save with temporary URLs if processing fails
+      console.log('⚡ Fallback: saving with temporary URLs...')
+
+      const fallbackImageData = images.map(image => ({
+        image_id: image.id,
+        replicate_url: image.url,
+        supabase_url: null, // Will be processed later
+        prompt: image.prompt,
+        model_version: modelVersion || null,
+        model_parameters: modelParameters || {},
+        generation_session: generationSession || `session_${Date.now()}`,
+        generated_at: new Date(image.timestamp).toISOString(),
+        tags: [],
+        quality_score: null,
+        webp_optimized: false, // Will be processed in background
+        storage_folder: 'generated/'
+      }))
+
+      const { data: fallbackSaved, error: fallbackError } = await supabase
+        .from('generated_images')
+        .insert(fallbackImageData)
+        .select()
+
+      if (fallbackError) {
+        throw new Error(`Fallback save failed: ${fallbackError.message}`)
+      }
+
+      console.log('⚡ Fallback save completed:', fallbackSaved?.length)
     }
-
-    console.log('✅ Successfully auto-saved generated images:', savedImages?.length)
 
     return NextResponse.json({
       success: true,
@@ -86,6 +134,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '50')
     const session = searchParams.get('session')
+    const webpOnly = searchParams.get('webp_only') === 'true'
 
     let query = supabase
       .from('generated_images')
@@ -97,15 +146,28 @@ export async function GET(request: NextRequest) {
       query = query.eq('generation_session', session)
     }
 
+    if (webpOnly) {
+      query = query.eq('webp_optimized', true)
+    }
+
     const { data, error } = await query
 
     if (error) {
       throw new Error(`Failed to fetch generated images: ${error.message}`)
     }
 
+    // 🎨 Priorizar URLs WebP optimizadas cuando estén disponibles
+    const optimizedImages = data?.map(image => ({
+      ...image,
+      display_url: image.supabase_url || image.replicate_url, // WebP first, fallback a original
+      is_webp_optimized: image.webp_optimized,
+      format: image.webp_optimized ? 'webp' : 'original'
+    })) || []
+
     return NextResponse.json({
-      images: data || [],
-      total: data?.length || 0
+      images: optimizedImages,
+      total: optimizedImages.length,
+      webp_optimized_count: optimizedImages.filter(img => img.webp_optimized).length
     })
   } catch (error) {
     console.error('❌ Fetch generated images failed:', error)

@@ -106,27 +106,41 @@ export default function ChatAgent() {
           console.log('🔗 Selected images cleared after successful combination')
         }
 
-        // Auto-save generated images to database
+        // Auto-save images to correct endpoint based on tool used
         if (data.tool_used === 'generate_images' || data.tool_used === 'combine_images') {
           try {
-            console.log('💾 Auto-saving generated images to database...')
+            // 🎯 ROUTING CORRECTO: usar endpoint específico según tool_used
+            const endpoint = data.tool_used === 'combine_images' ? '/api/combined' : '/api/generated'
+            const logType = data.tool_used === 'combine_images' ? 'combined images' : 'generated images'
 
-            const autoSaveResponse = await fetch('/api/generated', {
+            console.log(`💾 Auto-saving ${logType} to ${endpoint}...`)
+
+            // 🔄 Payload específico para combine_images
+            const payload = data.tool_used === 'combine_images'
+              ? {
+                  images: data.tool_result.images,
+                  sourceImages: selectedImages, // Context de imágenes seleccionadas
+                  combinationSession: `chat_combine_${Date.now()}`,
+                  modelUsed: 'nano-banana'
+                }
+              : {
+                  images: data.tool_result.images,
+                  modelVersion: 'daniel-carreon/danielcarrong:56c9356f',
+                  modelParameters: {
+                    tool_used: data.tool_used,
+                    prompt: data.tool_result.prompt,
+                    total: data.tool_result.total
+                  },
+                  generationSession: `chat_${Date.now()}`,
+                  toolUsed: data.tool_used
+                }
+
+            const autoSaveResponse = await fetch(endpoint, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({
-                images: data.tool_result.images,
-                modelVersion: 'daniel-carreon/danielcarrong:56c9356f',
-                modelParameters: {
-                  tool_used: data.tool_used,
-                  prompt: data.tool_result.prompt,
-                  total: data.tool_result.total
-                },
-                generationSession: `chat_${Date.now()}`,
-                toolUsed: data.tool_used // Pass tool_used for correct categorization
-              })
+              body: JSON.stringify(payload)
             })
 
             if (autoSaveResponse.ok) {

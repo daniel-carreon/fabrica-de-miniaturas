@@ -36,6 +36,7 @@ interface GeneratedImage {
   id: string
   image_id: string
   replicate_url: string
+  supabase_url?: string
   prompt: string
   model_version?: string
   model_parameters?: any
@@ -43,7 +44,22 @@ interface GeneratedImage {
   generated_at: string
   tags: string[]
   quality_score?: number
-  is_combined: boolean
+  webp_optimized: boolean
+}
+
+interface CombinedImage {
+  id: string
+  image_id: string
+  source_url: string
+  supabase_url?: string
+  combination_prompt: string
+  source_images: any[]
+  model_used: string
+  combination_session: string
+  created_at: string
+  tags: string[]
+  quality_score?: number
+  webp_optimized: boolean
 }
 
 interface UserUpload {
@@ -67,8 +83,9 @@ export default function HomePage() {
   // Data states
   const [favorites, setFavorites] = useState<FavoriteImage[]>([])
   const [generatedHistory, setGeneratedHistory] = useState<GeneratedImage[]>([])
+  const [combinedHistory, setCombinedHistory] = useState<CombinedImage[]>([])
   const [uploads, setUploads] = useState<UserUpload[]>([])
-  const [loading, setLoading] = useState({ favorites: false, generated: false, uploads: false })
+  const [loading, setLoading] = useState({ favorites: false, generated: false, combined: false, uploads: false })
 
   // Upload states
   const [uploading, setUploading] = useState(false)
@@ -96,14 +113,14 @@ export default function HomePage() {
       id: 'generated',
       label: 'Generated',
       icon: '⚡',
-      count: (Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.filter(img => !img.is_combined) : []).length,
+      count: (Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.length : 0),
       color: 'from-purple-600 to-blue-600'
     },
     {
       id: 'combined',
       label: 'Combined',
       icon: '🔄',
-      count: (Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).length + (Array.isArray(generatedHistory) ? generatedHistory.filter(img => img.is_combined) : []).length,
+      count: (Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).length + (Array.isArray(combinedHistory) ? combinedHistory.length : 0),
       color: 'from-orange-500 to-red-600'
     },
     {
@@ -161,6 +178,7 @@ export default function HomePage() {
     await Promise.all([
       loadFavorites(),
       loadGeneratedHistory(),
+      loadCombinedHistory(),
       loadUploads()
     ])
   }
@@ -192,6 +210,21 @@ export default function HomePage() {
       console.error('Error loading generated history:', error)
     } finally {
       setLoading(prev => ({ ...prev, generated: false }))
+    }
+  }
+
+  const loadCombinedHistory = async () => {
+    try {
+      setLoading(prev => ({ ...prev, combined: true }))
+      const response = await fetch('/api/combined?limit=50')
+      const data = await response.json()
+      if (response.ok) {
+        setCombinedHistory(data.images || [])
+      }
+    } catch (error) {
+      console.error('Error loading combined history:', error)
+    } finally {
+      setLoading(prev => ({ ...prev, combined: false }))
     }
   }
 
@@ -580,11 +613,11 @@ export default function HomePage() {
       )}
 
       {/* Generated Images Tab */}
-      {activeTab === 'generated' && ((Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length > 0 || (Array.isArray(generatedHistory) ? generatedHistory.filter(img => !img.is_combined) : []).length > 0) && (
+      {activeTab === 'generated' && ((Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length > 0 || (Array.isArray(generatedHistory) ? generatedHistory.length : 0) > 0) && (
         <GlassCard variant="dark" className="purple-glow">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white">
-              ✨ Generated Images ({(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.filter(img => !img.is_combined) : []).length})
+              ✨ Generated Images ({(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.length : 0)})
             </h2>
           </div>
           <div className="image-grid">
@@ -694,11 +727,11 @@ export default function HomePage() {
             ))}
 
             {/* Historical images from database */}
-            {generatedHistory.filter(img => !img.is_combined).map((historyImage) => (
+            {generatedHistory.map((historyImage) => (
               <ImageCard
                 key={`history-${historyImage.id}`}
                 id={historyImage.id}
-                url={historyImage.replicate_url}
+                url={historyImage.supabase_url || historyImage.replicate_url}
                 source="generated"
                 prompt={historyImage.prompt}
                 metadata={{
@@ -706,12 +739,13 @@ export default function HomePage() {
                   model: 'Flux Dev + DANI LoRA',
                   type: 'Historical Generation',
                   quality_score: historyImage.quality_score,
-                  session: historyImage.generation_session
+                  session: historyImage.generation_session,
+                  webp_optimized: historyImage.webp_optimized
                 }}
                 onToggleFavorite={async (id) => {
                   const imageToSave = {
                     id: historyImage.image_id,
-                    url: historyImage.replicate_url,
+                    url: historyImage.supabase_url || historyImage.replicate_url,
                     prompt: historyImage.prompt,
                     isSelected: false,
                     createdAt: new Date(historyImage.generated_at)
@@ -745,11 +779,16 @@ export default function HomePage() {
         <GlassCard variant="dark" className="purple-glow">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white">
-              🔄 Combined Images ({(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).length + (Array.isArray(generatedHistory) ? generatedHistory.filter(img => img.is_combined) : []).length})
+              🔄 Combined Images ({(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).length + (Array.isArray(combinedHistory) ? combinedHistory.length : 0)})
             </h2>
           </div>
 
-          {(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).length === 0 && (Array.isArray(generatedHistory) ? generatedHistory.filter(img => img.is_combined) : []).length === 0 ? (
+          {loading.combined ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400 mr-3"></div>
+              <span className="text-white">Loading combined images...</span>
+            </div>
+          ) : (Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).length === 0 && (Array.isArray(combinedHistory) ? combinedHistory.length : 0) === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">🔄</div>
               <h3 className="text-lg font-medium text-white mb-2">No combined images yet</h3>
@@ -783,7 +822,7 @@ export default function HomePage() {
                     } else {
                       // In combine mode or no selections, delete just this one
                       try {
-                        const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
+                        const response = await fetch(`/api/combined?id=${id}`, { method: 'DELETE' })
                         if (response.ok) {
                           const filteredImages = generatedImages.filter(img => img.id !== id)
                           setGeneratedImages(filteredImages)
@@ -796,27 +835,29 @@ export default function HomePage() {
                 />
               ))}
 
-              {/* Historical combined images */}
-              {generatedHistory.filter(img => img.is_combined).map((historyImage) => (
+              {/* Historical combined images from dedicated table */}
+              {combinedHistory.map((historyImage) => (
                 <ImageCard
                   key={`combined-history-${historyImage.id}`}
                   id={historyImage.id}
-                  url={historyImage.replicate_url}
+                  url={historyImage.supabase_url || historyImage.source_url}
                   source="combined"
-                  prompt={historyImage.prompt}
+                  prompt={historyImage.combination_prompt}
                   metadata={{
-                    timestamp: new Date(historyImage.generated_at).toLocaleString(),
-                    model: 'Nano Banana (Gemini 2.5 Flash)',
+                    timestamp: new Date(historyImage.created_at).toLocaleString(),
+                    model: historyImage.model_used || 'Nano Banana',
                     type: 'Historical Combined',
-                    session: historyImage.generation_session
+                    session: historyImage.combination_session,
+                    webp_optimized: historyImage.webp_optimized,
+                    source_images_count: historyImage.source_images?.length || 0
                   }}
                   onToggleFavorite={async (id) => {
                     const imageToSave = {
                       id: historyImage.image_id,
-                      url: historyImage.replicate_url,
-                      prompt: historyImage.prompt,
+                      url: historyImage.supabase_url || historyImage.source_url,
+                      prompt: historyImage.combination_prompt,
                       isSelected: false,
-                      createdAt: new Date(historyImage.generated_at)
+                      createdAt: new Date(historyImage.created_at)
                     }
                     await handleSaveFavorite(imageToSave)
                   }}
@@ -827,9 +868,9 @@ export default function HomePage() {
                     } else {
                       // In combine mode or no selections, delete just this one
                       try {
-                        const response = await fetch(`/api/generated?id=${id}`, { method: 'DELETE' })
+                        const response = await fetch(`/api/combined?id=${id}`, { method: 'DELETE' })
                         if (response.ok) {
-                          setGeneratedHistory(prev => prev.filter(img => img.id !== id))
+                          setCombinedHistory(prev => prev.filter(img => img.id !== id))
                         }
                       } catch (error) {
                         console.error('Error deleting combined history image:', error)
