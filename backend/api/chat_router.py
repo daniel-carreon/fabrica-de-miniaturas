@@ -116,7 +116,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-FRONTEND_URL = "http://localhost:3000"  # Ensure this matches your frontend port
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")  # Dynamic frontend URL
 
 if not OPENROUTER_API_KEY:
     raise ValueError("OPENROUTER_API_KEY environment variable is required")
