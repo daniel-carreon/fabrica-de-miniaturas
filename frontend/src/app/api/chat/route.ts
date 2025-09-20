@@ -171,13 +171,13 @@ You are part of "Daniel Flux Context" - a professional image generation system f
     console.log('✅ OpenRouter response received')
 
     const choice = data.choices?.[0]
-    const message = choice?.message
+    const responseMessage = choice?.message
 
     // Check if AI wants to use tools
-    if (message?.tool_calls && message.tool_calls.length > 0) {
-      console.log('🛠️ AI requested tool usage:', message.tool_calls.map(tc => tc.function.name))
+    if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
+      console.log('🛠️ AI requested tool usage:', responseMessage.tool_calls.map((tc: any) => tc.function.name))
 
-      const toolCall = message.tool_calls[0]
+      const toolCall = responseMessage.tool_calls[0]
       const functionName = toolCall.function.name
       const functionArgs = JSON.parse(toolCall.function.arguments)
 
@@ -286,7 +286,7 @@ You are part of "Daniel Flux Context" - a professional image generation system f
     }
 
     // Regular chat response (no tools used)
-    const assistantResponse = message?.content || 'I apologize, but I could not generate a response.'
+    const assistantResponse = responseMessage?.content || 'I apologize, but I could not generate a response.'
 
     console.log('🎯 Assistant response:', assistantResponse.substring(0, 100) + '...')
 

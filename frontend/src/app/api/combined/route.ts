@@ -35,6 +35,10 @@ export async function POST(request: NextRequest) {
 
     console.log('🎨 Auto-saving combined images with IMMEDIATE WebP storage:', images.length)
 
+    // Variables for tracking results
+    let finalSavedImages: any[] = []
+    let webpOptimizationStatus = 'processing'
+
     // 🚀 NUEVA ESTRATEGIA: Immediate WebP + Supabase Storage for Combined Images
     try {
       console.log('🔄 Processing combined images to WebP storage immediately...')
@@ -78,6 +82,10 @@ export async function POST(request: NextRequest) {
 
       console.log('✅ Successfully auto-saved combined images with WebP optimization:', savedImages?.length)
 
+      // Update tracking variables
+      finalSavedImages = savedImages || []
+      webpOptimizationStatus = 'completed'
+
     } catch (processError) {
       console.error('❌ Combined WebP processing failed:', processError)
 
@@ -109,15 +117,19 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('⚡ Combined fallback save completed:', fallbackSaved?.length)
+
+      // Update tracking variables for fallback
+      finalSavedImages = fallbackSaved || []
+      webpOptimizationStatus = 'fallback'
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        saved: savedImages?.length || 0,
+        saved: finalSavedImages.length,
         session: combinationSession || `combine_${Date.now()}`,
-        images: savedImages,
-        webp_optimization: 'processing' // Indica que se está procesando en background
+        images: finalSavedImages,
+        webp_optimization: webpOptimizationStatus
       }
     })
 

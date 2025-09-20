@@ -113,13 +113,14 @@ export async function migrateExistingImages() {
 
       } catch (error) {
         console.error(`❌ Update failed for ${processedImg.id}:`, error)
-        return { success: false, id: processedImg.id, error: error.message }
+        return { success: false, id: processedImg.id, error: error instanceof Error ? error.message : 'Unknown error' }
       }
     })
 
     const updateResults = await Promise.allSettled(updatePromises)
     const successfulUpdates = updateResults
-      .filter(result => result.status === 'fulfilled' && result.value.success)
+      .filter((result): result is PromiseFulfilledResult<{ success: boolean; id: string }> =>
+        result.status === 'fulfilled' && result.value.success)
       .map(result => result.value.id)
 
     console.log(`📊 Database updates: ${successfulUpdates.length}/${processedImages.length} successful`)
@@ -175,7 +176,7 @@ if (require.main === module) {
   migrateExistingImages()
     .then(result => {
       console.log('🎉 Migration script completed:', result)
-      if (result.expired > 0) {
+      if (result.expired && result.expired > 0) {
         console.log('⚠️ Consider running cleanup for expired images')
       }
       process.exit(0)

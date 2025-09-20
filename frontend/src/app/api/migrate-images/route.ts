@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     for (const img of imagesToMigrate) {
       try {
-        const response = await fetch(img.replicate_url, { method: 'HEAD', timeout: 10000 })
+        const response = await fetch(img.replicate_url, { method: 'HEAD' })
         if (response.ok) {
           validImages.push(img)
           console.log(`✅ URL válida: ${img.image_id}`)
@@ -103,13 +103,14 @@ export async function POST(request: NextRequest) {
 
       } catch (error) {
         console.error(`❌ Update failed for ${processedImg.id}:`, error)
-        return { success: false, id: processedImg.id, error: error.message }
+        return { success: false, id: processedImg.id, error: error instanceof Error ? error.message : 'Unknown error' }
       }
     })
 
     const updateResults = await Promise.allSettled(updatePromises)
     const successfulUpdates = updateResults
-      .filter(result => result.status === 'fulfilled' && result.value.success)
+      .filter((result): result is PromiseFulfilledResult<{ success: boolean; id: string }> =>
+        result.status === 'fulfilled' && result.value.success)
       .map(result => result.value.id)
 
     console.log(`📊 Database updates: ${successfulUpdates.length}/${processedImages.length} successful`)

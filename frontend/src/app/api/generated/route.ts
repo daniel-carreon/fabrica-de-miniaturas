@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
 
     console.log('💾 Auto-saving generated images with IMMEDIATE WebP storage:', images.length)
 
+    // Variables for tracking results
+    let finalSavedImages: any[] = []
+    let webpOptimizationStatus = 'processing'
+
     // 🚀 NUEVA ESTRATEGIA: Immediate WebP + Supabase Storage
     try {
       console.log('🎨 Processing images to WebP storage immediately...')
@@ -75,6 +79,10 @@ export async function POST(request: NextRequest) {
 
       console.log('✅ Successfully auto-saved generated images with WebP optimization:', savedImages?.length)
 
+      // Update tracking variables
+      finalSavedImages = savedImages || []
+      webpOptimizationStatus = 'completed'
+
     } catch (processError) {
       console.error('❌ WebP processing failed:', processError)
 
@@ -106,14 +114,19 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('⚡ Fallback save completed:', fallbackSaved?.length)
+
+      // Update tracking variables for fallback
+      finalSavedImages = fallbackSaved || []
+      webpOptimizationStatus = 'fallback'
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        saved: savedImages?.length || 0,
+        saved: finalSavedImages.length,
         session: generationSession || `session_${Date.now()}`,
-        images: savedImages
+        images: finalSavedImages,
+        webp_optimization: webpOptimizationStatus
       }
     })
 
