@@ -22,6 +22,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://daniel-flux-context.vercel.app", // Production frontend
         "http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003",
         "http://localhost:3004", "http://localhost:3005", "http://localhost:3006"
     ],

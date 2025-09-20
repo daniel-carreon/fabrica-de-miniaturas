@@ -66,25 +66,35 @@ export async function detectBackendPort(): Promise<number | null> {
  * Falls back to port 8000 if detection fails
  */
 export async function getBackendUrl(): Promise<string> {
+  // 1. Check for a production URL first
+  const prodUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (prodUrl) {
+    console.log(`🚀 Using production backend URL: ${prodUrl}`);
+    return prodUrl;
+  }
+
+  // 2. If no production URL, proceed with local development detection
+  console.log('🏠 In development mode, detecting local backend port...');
+
   // Try to read port from environment first
-  const envPort = process.env.NEXT_PUBLIC_BACKEND_PORT
+  const envPort = process.env.NEXT_PUBLIC_BACKEND_PORT;
   if (envPort) {
-    const port = parseInt(envPort)
-    const result = await testBackendPort(port)
+    const port = parseInt(envPort);
+    const result = await testBackendPort(port);
     if (result.available) {
-      return `http://localhost:${port}`
+      return `http://localhost:${port}`;
     }
   }
 
   // Auto-detect port
-  const detectedPort = await detectBackendPort()
+  const detectedPort = await detectBackendPort();
   if (detectedPort) {
-    return `http://localhost:${detectedPort}`
+    return `http://localhost:${detectedPort}`;
   }
 
   // Fallback to default
-  console.warn('🔄 Falling back to default port 8000')
-  return 'http://localhost:8000'
+  console.warn('🔄 Falling back to default port 8000');
+  return 'http://localhost:8000';
 }
 
 /**
