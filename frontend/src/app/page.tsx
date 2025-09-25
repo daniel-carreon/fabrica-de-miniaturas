@@ -174,6 +174,25 @@ export default function HomePage() {
     loadAllData()
   }, [])
 
+  // 🔄 Listen for image updates from ChatAgent and reload appropriately
+  useEffect(() => {
+    const handleImagesUpdated = (event: CustomEvent) => {
+      const { type, endpoint, count } = event.detail
+      console.log(`🔄 Received reload event: ${type} (${count} images from ${endpoint})`)
+
+      if (type === 'combine_images') {
+        console.log('🔄 Reloading combined images after auto-save...')
+        loadCombinedHistory()
+      } else if (type === 'generate_images') {
+        console.log('🔄 Reloading generated images after auto-save...')
+        loadGeneratedHistory()
+      }
+    }
+
+    window.addEventListener('imagesUpdated', handleImagesUpdated)
+    return () => window.removeEventListener('imagesUpdated', handleImagesUpdated)
+  }, [])
+
   const loadAllData = async () => {
     await Promise.all([
       loadFavorites(),
@@ -201,7 +220,7 @@ export default function HomePage() {
   const loadGeneratedHistory = async () => {
     try {
       setLoading(prev => ({ ...prev, generated: true }))
-      const response = await fetch('/api/generated?limit=50')
+      const response = await fetch('/api/generated?limit=100')
       const data = await response.json()
       if (response.ok) {
         setGeneratedHistory(data.images || [])
@@ -216,7 +235,7 @@ export default function HomePage() {
   const loadCombinedHistory = async () => {
     try {
       setLoading(prev => ({ ...prev, combined: true }))
-      const response = await fetch('/api/combined?limit=50')
+      const response = await fetch('/api/combined?limit=100')
       const data = await response.json()
       if (response.ok) {
         setCombinedHistory(data.images || [])

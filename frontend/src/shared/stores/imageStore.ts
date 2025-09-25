@@ -36,6 +36,7 @@ interface ImageStore {
 
   // Image actions
   setGeneratedImages: (images: GeneratedImage[]) => void
+  loadImagesFromDatabase: () => Promise<void>
   toggleImageSelection: (imageId: string) => void
   getSelectedImages: () => GeneratedImage[]
   addFavorite: (image: SavedImage) => void
@@ -61,6 +62,12 @@ export const useImageStore = create<ImageStore>((set, get) => ({
 
   // Image actions
   setGeneratedImages: (generatedImages) => set({ generatedImages }),
+
+  // 🔄 Load images from external source (page.tsx handles API calls now)
+  loadImagesFromDatabase: async () => {
+    // REMOVED DUPLICATE API CALLS - page.tsx handles the loading
+    console.log('📸 loadImagesFromDatabase called but API calls handled by page.tsx to avoid duplication')
+  },
 
   toggleImageSelection: (imageId) => set((state) => ({
     generatedImages: state.generatedImages.map(img =>

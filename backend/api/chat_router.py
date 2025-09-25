@@ -495,6 +495,17 @@ async def call_combine_images_api_single(image_urls: List[str], prompt: str, out
         async with httpx.AsyncClient() as client:
             images_b64 = []
             for i, url in enumerate(image_urls, 1):
+                # 🚨 URL VALIDATION: Check if URL is accessible before downloading
+                try:
+                    # Quick head request to validate URL
+                    head_response = await client.head(url, timeout=10.0)
+                    if head_response.status_code == 404:
+                        logger.warning(f"⚠️ Skipping invalid URL (404): {url[:100]}...")
+                        continue
+                except Exception as e:
+                    logger.warning(f"⚠️ Skipping unreachable URL: {url[:100]}... - {str(e)}")
+                    continue
+
                 logger.info(f"📥 Downloading image {i}/{len(image_urls)}: {url[:100]}...")
                 img_response = await client.get(url, timeout=30.0)
                 img_response.raise_for_status()
@@ -502,6 +513,17 @@ async def call_combine_images_api_single(image_urls: List[str], prompt: str, out
                 # Convert to base64
                 img_b64 = base64.b64encode(img_response.content).decode('utf-8')
                 images_b64.append(img_b64)
+
+            # 🚨 VALIDATION: Ensure we have at least one valid image
+            if len(images_b64) == 0:
+                logger.error(f"💥 No valid images found from {len(image_urls)} provided URLs")
+                return {
+                    "success": False,
+                    "error": f"All {len(image_urls)} image URLs were invalid or unreachable",
+                    "images": []
+                }
+
+            logger.info(f"✅ Successfully downloaded {len(images_b64)}/{len(image_urls)} valid images")
 
             # Translate Spanish to English first
             english_prompt = await translate_to_english(prompt)
@@ -722,8 +744,10 @@ async def chat_endpoint(request: ChatRequest):
         # Prepare messages with multimodal support
         messages = [{"role": "system", "content": system_content}]
 
-        # Add conversation history (text only)
-        for msg in request.messages[-10:]:
+        # 🚨 AGGRESSIVE CONTEXT TRUNCATION: Only keep last 2 messages to prevent 762k tokens overflow
+        # This is the 20% fix that solves 80% of context issues
+        recent_messages = request.messages[-2:] if len(request.messages) > 2 else request.messages
+        for msg in recent_messages:
             messages.append({"role": msg.role, "content": msg.content})
 
         # Prepare user message with vision capabilities
@@ -734,11 +758,21 @@ async def chat_endpoint(request: ChatRequest):
         if request.selectedImages:
             logger.info(f"👁️ Adding {len(request.selectedImages)} images for GPT-5 vision analysis")
             for i, img in enumerate(request.selectedImages):
-                user_message_content.append({
-                    "type": "image_url",
-                    "image_url": {"url": img.url}
-                })
-                logger.info(f"🖼️ Image {i+1}: {img.url[:100]}... (Source: {img.source})")
+                # 🚨 CRITICAL FIX: Replace base64 images with text placeholders to prevent context overflow
+                if img.url.startswith('data:'):
+                    # For base64 images, add placeholder description instead of full image
+                    user_message_content.append({
+                        "type": "text",
+                        "text": f"[Base64 Combined Image] (Source: {img.source}) - Using text placeholder to prevent context overflow"
+                    })
+                    logger.info(f"🖼️ Image {i+1}: [Base64 Combined Image] (Source: {img.source}) - Using text placeholder to prevent context overflow")
+                else:
+                    # Regular URLs are fine
+                    user_message_content.append({
+                        "type": "image_url",
+                        "image_url": {"url": img.url}
+                    })
+                    logger.info(f"🖼️ Image {i+1}: {img.url[:100]}... (Source: {img.source})")
 
         # Add the multimodal user message
         messages.append({

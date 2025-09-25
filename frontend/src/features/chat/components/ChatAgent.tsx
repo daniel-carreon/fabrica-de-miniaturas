@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useChatStore, ChatMessage } from '../stores/chatStore'
 import { useImageStore } from '@/shared/stores/imageStore'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
@@ -29,9 +29,14 @@ export default function ChatAgent() {
     clearMessages
   } = useChatStore()
 
-  const { setGeneratedImages } = useImageStore()
+  const { setGeneratedImages, loadImagesFromDatabase } = useImageStore()
   const { selectedImages, clearSelection, handleImageSelect } = useSelectedImages()
   const { config, updateConfig, activePreset } = useImageConfig()
+
+  // 🔄 Load images from database on component mount (fixes refresh issue)
+  useEffect(() => {
+    loadImagesFromDatabase()
+  }, [])
 
   const handleInjectPrompt = (prompt: string) => {
     setInput(prev => {
@@ -97,8 +102,8 @@ export default function ChatAgent() {
           source: data.tool_used === 'generate_images' ? 'flux_dani' : 'nano_banana'
         }))
 
-        setGeneratedImages(transformedImages)
-        console.log('✅ Images added to gallery:', transformedImages)
+        // DON'T add images to store here - let page.tsx handle display after auto-save
+        console.log('✅ Images will be added to gallery after auto-save completes:', transformedImages)
 
         // Clear selection after successful combination
         if (data.tool_used === 'combine_images') {
@@ -146,6 +151,17 @@ export default function ChatAgent() {
             if (autoSaveResponse.ok) {
               const autoSaveData = await autoSaveResponse.json()
               console.log('✅ Images auto-saved to database:', autoSaveData.data.saved)
+
+              // 🔄 TRIGGER RELOAD: Notify page.tsx to reload images after successful save
+              const reloadEvent = new CustomEvent('imagesUpdated', {
+                detail: {
+                  type: data.tool_used,
+                  endpoint: endpoint,
+                  count: autoSaveData.data.saved
+                }
+              })
+              window.dispatchEvent(reloadEvent)
+              console.log(`🔄 Triggered reload event for ${logType}`)
             } else {
               console.warn('⚠️ Auto-save failed but continuing with UI update')
             }

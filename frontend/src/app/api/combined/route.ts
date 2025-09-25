@@ -172,10 +172,10 @@ export async function GET(request: NextRequest) {
       throw new Error(`Failed to fetch combined images: ${error.message}`)
     }
 
-    // 🎨 Priorizar URLs WebP optimizadas cuando estén disponibles
+    // 🎨 Usar SOLO URLs optimizadas de Supabase Storage (evita transferir 69MB de base64)
     const optimizedImages = data?.map(image => ({
       ...image,
-      display_url: image.supabase_url || image.source_url, // WebP first, fallback a original
+      display_url: image.supabase_url, // Solo URLs optimizadas - no fallback a source_url gigante
       is_webp_optimized: image.webp_optimized,
       format: image.webp_optimized ? 'webp' : 'original'
     })) || []

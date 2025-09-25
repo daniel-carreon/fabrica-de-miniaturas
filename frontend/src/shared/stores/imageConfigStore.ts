@@ -141,6 +141,32 @@ const useImageConfigStore = create<ImageConfigState>()(
         isPanelExpanded: state.isPanelExpanded
       }),
 
+      // Migration function to handle state structure changes
+      migrate: (persistedState: any, version: number) => {
+        console.log('🔄 Migrating image config store from version', version)
+
+        // For any version mismatch, return a clean state structure
+        if (typeof persistedState === 'object' && persistedState !== null) {
+          return {
+            config: persistedState.config || DEFAULT_CONFIG,
+            activePreset: persistedState.activePreset || null,
+            customPresets: persistedState.customPresets || {},
+            isPanelExpanded: persistedState.isPanelExpanded || false
+          }
+        }
+
+        // If persisted state is invalid, return defaults
+        return {
+          config: DEFAULT_CONFIG,
+          activePreset: null,
+          customPresets: {},
+          isPanelExpanded: false
+        }
+      },
+
+      // Current version for migration tracking
+      version: 1,
+
       // Merge persisted state back
       onRehydrateStorage: () => (state, error) => {
         if (error) {
