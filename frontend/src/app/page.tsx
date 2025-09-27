@@ -118,7 +118,14 @@ export default function HomePage() {
     {
       id: 'generated',
       label: 'Generated',
-      icon: '⚡',
+      icon: '🎨',
+      count: (Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'create_from_scratch') : []).length,
+      color: 'from-emerald-600 to-teal-600'
+    },
+    {
+      id: 'avatar',
+      label: 'Avatar',
+      icon: '👤',
       count: (Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.length : 0),
       color: 'from-purple-600 to-blue-600'
     },
@@ -694,12 +701,66 @@ export default function HomePage() {
         </GlassCard>
       )}
 
-      {/* Generated Images Tab */}
-      {activeTab === 'generated' && ((Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length > 0 || (Array.isArray(generatedHistory) ? generatedHistory.length : 0) > 0) && (
+      {/* Generated Images Tab (New: Create from scratch) */}
+      {activeTab === 'generated' && (
         <GlassCard variant="dark" className="purple-glow">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white">
-              ✨ Generated Images ({(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.length : 0)})
+              🎨 Generated Images (Create from Scratch) ({(Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'create_from_scratch') : []).length})
+            </h2>
+          </div>
+
+          {(Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'create_from_scratch') : []).length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🎨</div>
+              <h3 className="text-lg font-medium text-white mb-2">No generated images yet</h3>
+              <p className="text-purple-200">
+                Ask the AI agent to create images from scratch without using your avatar!
+              </p>
+            </div>
+          ) : (
+            <div className="image-grid">
+              {(Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'create_from_scratch') : []).map((image) => (
+                <ImageCard
+                  key={image.id}
+                  id={image.id}
+                  url={image.url}
+                  source="generated"
+                  prompt={image.prompt}
+                  metadata={{
+                    timestamp: image.createdAt?.toLocaleString() || 'Unknown',
+                    model: 'AI Generated (No Avatar)',
+                    type: 'Created from Scratch'
+                  }}
+                  onToggleFavorite={(id) => {
+                    const imageToSave = Array.isArray(generatedImages) ? generatedImages.find(img => img.id === id) : null
+                    if (imageToSave) handleSaveFavorite(imageToSave)
+                  }}
+                  onDelete={async (id) => {
+                    if (!combineMode && selectedImages.length > 0) {
+                      handleDeleteSelected()
+                    } else {
+                      try {
+                        const filteredImages = generatedImages.filter(img => img.id !== id)
+                        setGeneratedImages(filteredImages)
+                      } catch (error) {
+                        console.error('Error deleting generated image:', error)
+                      }
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      )}
+
+      {/* Avatar Images Tab (Previously Generated) */}
+      {activeTab === 'avatar' && ((Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length > 0 || (Array.isArray(generatedHistory) ? generatedHistory.length : 0) > 0) && (
+        <GlassCard variant="dark" className="purple-glow">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white">
+              👤 Avatar Images (DANI LoRA) ({(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.length : 0)})
             </h2>
 
             {/* Pagination Controls for Generated */}

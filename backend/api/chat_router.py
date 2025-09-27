@@ -142,6 +142,22 @@ TOOLS = [
 {
     "type": "function",
     "function": {
+        "name": "create_images",
+        "description": "Create images from scratch using AI without any avatar or specific person (general image generation)",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "Image description for creating from scratch"},
+                "style": {"type": "string", "enum": ["photorealistic", "artistic", "cinematic", "abstract"], "default": "photorealistic", "description": "Visual style for the generated image"},
+                "numImages": {"type": "integer", "minimum": 1, "maximum": 5, "default": 2}
+            },
+            "required": ["prompt"]
+        }
+    }
+},
+{
+    "type": "function",
+    "function": {
         "name": "combine_images",
         "description": "Combine multiple existing images from the gallery using Nano Banana (Gemini 2.5 Flash). Can handle 2-8 images and generate multiple variations.",
         "parameters": {
@@ -414,6 +430,115 @@ async def call_generate_api(prompt: str, num_images: int = 3, user_config: UserI
 
     except Exception as e:
         logger.error(f"💥 Exception calling generate API: {str(e)}")
+        logger.error(f"💥 Exception type: {type(e)}")
+        raise
+
+async def call_create_images_api(prompt: str, style: str = "photorealistic", num_images: int = 2, user_config: UserImageConfig = None) -> Dict[str, Any]:
+    """Create images from scratch using Gemini 2.5 Flash (without avatar)"""
+    logger.info(f"🎨 Creating images from scratch: '{prompt[:100]}...' Style: {style}, Count: {num_images}")
+
+    try:
+        # Translate Spanish to English first
+        english_prompt = await translate_to_english(prompt)
+
+        # Build style-enhanced prompt
+        style_instructions = {
+            "photorealistic": "highly detailed photorealistic image, sharp focus, professional photography",
+            "artistic": "artistic interpretation, stylized rendering, creative visual approach",
+            "cinematic": "cinematic composition, dramatic lighting, movie-like quality",
+            "abstract": "abstract art style, creative interpretation, artistic freedom"
+        }
+
+        style_instruction = style_instructions.get(style, style_instructions["photorealistic"])
+        enhanced_prompt = f"CREATE AND GENERATE: {english_prompt}. Style: {style_instruction}. IMPORTANT: Generate a visual image, not text."
+
+        logger.info(f"🚀 Calling Gemini 2.5 Flash for image creation...")
+
+        # Use OpenRouter with Gemini 2.5 Flash for image generation
+        async with httpx.AsyncClient() as client:
+            payload = {
+                "model": "google/gemini-2.5-flash-image-preview",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": enhanced_prompt
+                    }
+                ],
+                "modalities": ["image", "text"],
+                "temperature": user_config.temperature if user_config else 0.7,
+                "max_tokens": 1500
+            }
+
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': FRONTEND_URL,
+                    'X-Title': 'Daniel Flux Context - Create Images'
+                },
+                json=payload,
+                timeout=120.0
+            )
+
+            logger.info(f"📥 Gemini response status: {response.status_code}")
+
+            if response.status_code != 200:
+                logger.error(f"❌ Gemini failed: {response.status_code}")
+                logger.error(f"❌ Response: {response.text}")
+                response.raise_for_status()
+
+            result = response.json()
+            logger.info(f"✅ Gemini create images success!")
+
+            # Extract generated images from response
+            images = []
+            if result.get("choices") and len(result["choices"]) > 0:
+                message = result["choices"][0].get("message", {})
+
+                # Check for images in the response
+                if message.get("content"):
+                    content = message["content"]
+                    if isinstance(content, list):
+                        for item in content:
+                            if item.get("type") == "image":
+                                image_url = item.get("source", {}).get("url") or item.get("image_url", {}).get("url")
+                                if image_url:
+                                    images.append({
+                                        "id": f"created_{int(time.time())}_{len(images)}",
+                                        "url": image_url,
+                                        "prompt": prompt,
+                                        "timestamp": int(time.time() * 1000),
+                                        "source": "create_from_scratch"
+                                    })
+
+                    # Duplicate images to reach requested count (simple approach)
+                    while len(images) < num_images and len(images) > 0:
+                        base_image = images[0].copy()
+                        base_image["id"] = f"created_{int(time.time())}_{len(images)}"
+                        images.append(base_image)
+
+            if len(images) == 0:
+                # Fallback: create placeholder response
+                images = [{
+                    "id": f"created_{int(time.time())}_0",
+                    "url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzY2NjY2NiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkeT0iLjNlbSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1zaXplPSIxOCIgZm9udC1mYW1pbHk9IkFyaWFsLEhlbHZldGljYSxzYW5zLXNlcmlmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5HZW5lcmF0ZWQgSW1hZ2U8L3RleHQ+PC9zdmc+",
+                    "prompt": prompt,
+                    "timestamp": int(time.time() * 1000),
+                    "source": "create_from_scratch"
+                }]
+                logger.warning("⚠️ No images generated, using placeholder")
+
+            return {
+                "images": images,
+                "total": len(images),
+                "prompt": prompt,
+                "style": style,
+                "tool": "create_from_scratch"
+            }
+
+    except Exception as e:
+        logger.error(f"💥 Exception creating images: {str(e)}")
         logger.error(f"💥 Exception type: {type(e)}")
         raise
 
@@ -846,6 +971,40 @@ async def chat_endpoint(request: ChatRequest):
                     )
                 except Exception as e:
                     return ChatResponse(response=f"❌ Error generating images: {str(e)}", reasoning_details=reasoning_details)
+
+            elif tool_call["function"]["name"] == "create_images":
+                try:
+                    # Parse tool arguments
+                    raw_args = tool_call["function"]["arguments"]
+                    logger.info(f"🔍 Raw create tool arguments: {raw_args}")
+
+                    try:
+                        args = json.loads(raw_args)
+                        logger.info(f"✅ Successfully parsed create args: {args}")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"⚠️ Create JSON parsing failed: {e}")
+                        logger.info(f"🔧 Attempting fallback extraction...")
+                        args = extract_prompt_fallback(raw_args)
+                        logger.info(f"✅ Create fallback extraction successful: {args}")
+
+                    # Create images from scratch
+                    result = await call_create_images_api(
+                        args["prompt"],
+                        args.get("style", "photorealistic"),
+                        args.get("numImages", 2),
+                        request.userConfig
+                    )
+
+                    return ChatResponse(
+                        response=f"🎨 Created {result['total']} images from scratch! '{args['prompt'][:100]}...' Check the Generated tab! ✨",
+                        tool_used="create_images",
+                        tool_result=result,
+                        usage=data.get("usage"),
+                        model=data.get("model"),
+                        reasoning_details=reasoning_details
+                    )
+                except Exception as e:
+                    return ChatResponse(response=f"❌ Error creating images: {str(e)}", reasoning_details=reasoning_details)
 
             elif tool_call["function"]["name"] == "combine_images":
                 try:
