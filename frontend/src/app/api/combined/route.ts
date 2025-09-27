@@ -148,15 +148,35 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500) // Default 100, max 500
+    const offset = parseInt(searchParams.get('offset') || '0')
     const session = searchParams.get('session')
     const webpOnly = searchParams.get('webp_only') === 'true'
 
+    // Get total count first
+    let countQuery = supabase
+      .from('combined_images')
+      .select('id', { count: 'exact' })
+
+    if (session) {
+      countQuery = countQuery.eq('combination_session', session)
+    }
+    if (webpOnly) {
+      countQuery = countQuery.eq('webp_optimized', true)
+    }
+
+    const { count: totalCount } = await countQuery
+
+    // Get paginated data
     let query = supabase
       .from('combined_images')
-      .select('*')
+      .select(`
+        id, image_id, supabase_url, combination_prompt,
+        model_used, combination_session, created_at,
+        tags, quality_score, webp_optimized, storage_folder
+      `)
       .order('created_at', { ascending: false })
-      .limit(limit)
+      .range(offset, offset + limit - 1)
 
     if (session) {
       query = query.eq('combination_session', session)
@@ -182,7 +202,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       images: optimizedImages,
-      total: optimizedImages.length,
+      total: totalCount || 0,
+      returned: optimizedImages.length,
+      limit,
+      offset,
+      hasMore: totalCount ? (offset + limit < totalCount) : false,
       webp_optimized_count: optimizedImages.filter(img => img.webp_optimized).length
     })
   } catch (error) {

@@ -87,6 +87,12 @@ export default function HomePage() {
   const [uploads, setUploads] = useState<UserUpload[]>([])
   const [loading, setLoading] = useState({ favorites: false, generated: false, combined: false, uploads: false })
 
+  // Pagination states
+  const [paginationState, setPaginationState] = useState({
+    generated: { limit: 100, offset: 0, total: 0, hasMore: false },
+    combined: { limit: 100, offset: 0, total: 0, hasMore: false }
+  })
+
   // Upload states
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -217,13 +223,30 @@ export default function HomePage() {
     }
   }
 
-  const loadGeneratedHistory = async () => {
+  const loadGeneratedHistory = async (append = false) => {
     try {
       setLoading(prev => ({ ...prev, generated: true }))
-      const response = await fetch('/api/generated?limit=100')
+      const currentState = paginationState.generated
+      const offset = append ? currentState.offset + currentState.limit : 0
+
+      const response = await fetch(`/api/generated?limit=${currentState.limit}&offset=${offset}`)
       const data = await response.json()
       if (response.ok) {
-        setGeneratedHistory(data.images || [])
+        if (append) {
+          setGeneratedHistory(prev => [...prev, ...(data.images || [])])
+        } else {
+          setGeneratedHistory(data.images || [])
+        }
+
+        setPaginationState(prev => ({
+          ...prev,
+          generated: {
+            ...prev.generated,
+            offset: offset,
+            total: data.total || 0,
+            hasMore: data.hasMore || false
+          }
+        }))
       }
     } catch (error) {
       console.error('Error loading generated history:', error)
@@ -232,13 +255,30 @@ export default function HomePage() {
     }
   }
 
-  const loadCombinedHistory = async () => {
+  const loadCombinedHistory = async (append = false) => {
     try {
       setLoading(prev => ({ ...prev, combined: true }))
-      const response = await fetch('/api/combined?limit=100')
+      const currentState = paginationState.combined
+      const offset = append ? currentState.offset + currentState.limit : 0
+
+      const response = await fetch(`/api/combined?limit=${currentState.limit}&offset=${offset}`)
       const data = await response.json()
       if (response.ok) {
-        setCombinedHistory(data.images || [])
+        if (append) {
+          setCombinedHistory(prev => [...prev, ...(data.images || [])])
+        } else {
+          setCombinedHistory(data.images || [])
+        }
+
+        setPaginationState(prev => ({
+          ...prev,
+          combined: {
+            ...prev.combined,
+            offset: offset,
+            total: data.total || 0,
+            hasMore: data.hasMore || false
+          }
+        }))
       }
     } catch (error) {
       console.error('Error loading combined history:', error)
@@ -338,6 +378,29 @@ export default function HomePage() {
         originalButton.disabled = false
         originalButton.style.opacity = '1'
       }
+    }
+  }
+
+  // Pagination functions
+  const changeLimit = async (tab: 'generated' | 'combined', newLimit: number) => {
+    setPaginationState(prev => ({
+      ...prev,
+      [tab]: { ...prev[tab], limit: newLimit, offset: 0 }
+    }))
+
+    // Reload data with new limit
+    if (tab === 'generated') {
+      await loadGeneratedHistory(false)
+    } else if (tab === 'combined') {
+      await loadCombinedHistory(false)
+    }
+  }
+
+  const loadMore = async (tab: 'generated' | 'combined') => {
+    if (tab === 'generated' && paginationState.generated.hasMore) {
+      await loadGeneratedHistory(true)
+    } else if (tab === 'combined' && paginationState.combined.hasMore) {
+      await loadCombinedHistory(true)
     }
   }
 
@@ -638,6 +701,43 @@ export default function HomePage() {
             <h2 className="text-xl font-bold text-white">
               ✨ Generated Images ({(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).length + (Array.isArray(generatedHistory) ? generatedHistory.length : 0)})
             </h2>
+
+            {/* Pagination Controls for Generated */}
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-purple-200">
+                {paginationState.generated.total > 0 && (
+                  <span>Showing {Math.min(paginationState.generated.offset + paginationState.generated.limit, paginationState.generated.total)} of {paginationState.generated.total}</span>
+                )}
+              </div>
+
+              <select
+                value={paginationState.generated.limit}
+                onChange={(e) => changeLimit('generated', parseInt(e.target.value))}
+                className="px-3 py-1 bg-black/30 border border-purple-500/30 rounded text-white text-sm focus:outline-none focus:border-purple-400"
+              >
+                <option value={50}>50 images</option>
+                <option value={100}>100 images</option>
+                <option value={200}>200 images</option>
+                <option value={500}>500 images</option>
+              </select>
+
+              {paginationState.generated.hasMore && (
+                <button
+                  onClick={() => loadMore('generated')}
+                  disabled={loading.generated}
+                  className="px-4 py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm rounded transition-colors flex items-center gap-2"
+                >
+                  {loading.generated ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b border-white"></div>
+                      Loading...
+                    </>
+                  ) : (
+                    'Load More'
+                  )}
+                </button>
+              )}
+            </div>
           </div>
           <div className="image-grid">
             {(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'flux_dani' || !img.source) : []).map((image) => (
@@ -800,6 +900,43 @@ export default function HomePage() {
             <h2 className="text-xl font-bold text-white">
               🔄 Combined Images ({(Array.isArray(generatedImages) ? generatedImages.filter(img => img.source === 'nano_banana') : []).length + (Array.isArray(combinedHistory) ? combinedHistory.length : 0)})
             </h2>
+
+            {/* Pagination Controls for Combined */}
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-orange-200">
+                {paginationState.combined.total > 0 && (
+                  <span>Showing {Math.min(paginationState.combined.offset + paginationState.combined.limit, paginationState.combined.total)} of {paginationState.combined.total}</span>
+                )}
+              </div>
+
+              <select
+                value={paginationState.combined.limit}
+                onChange={(e) => changeLimit('combined', parseInt(e.target.value))}
+                className="px-3 py-1 bg-black/30 border border-orange-500/30 rounded text-white text-sm focus:outline-none focus:border-orange-400"
+              >
+                <option value={50}>50 images</option>
+                <option value={100}>100 images</option>
+                <option value={200}>200 images</option>
+                <option value={500}>500 images</option>
+              </select>
+
+              {paginationState.combined.hasMore && (
+                <button
+                  onClick={() => loadMore('combined')}
+                  disabled={loading.combined}
+                  className="px-4 py-1 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-sm rounded transition-colors flex items-center gap-2"
+                >
+                  {loading.combined ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b border-white"></div>
+                      Loading...
+                    </>
+                  ) : (
+                    'Load More'
+                  )}
+                </button>
+              )}
+            </div>
           </div>
 
           {loading.combined ? (

@@ -145,15 +145,35 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500) // Default 100, max 500
+    const offset = parseInt(searchParams.get('offset') || '0')
     const session = searchParams.get('session')
     const webpOnly = searchParams.get('webp_only') === 'true'
 
+    // Get total count first
+    let countQuery = supabase
+      .from('generated_images')
+      .select('id', { count: 'exact' })
+
+    if (session) {
+      countQuery = countQuery.eq('generation_session', session)
+    }
+    if (webpOnly) {
+      countQuery = countQuery.eq('webp_optimized', true)
+    }
+
+    const { count: totalCount } = await countQuery
+
+    // Get paginated data
     let query = supabase
       .from('generated_images')
-      .select('*')
+      .select(`
+        id, image_id, replicate_url, supabase_url, prompt,
+        model_version, generation_session, generated_at,
+        webp_optimized, created_at
+      `)
       .order('generated_at', { ascending: false })
-      .limit(limit)
+      .range(offset, offset + limit - 1)
 
     if (session) {
       query = query.eq('generation_session', session)
@@ -179,7 +199,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       images: optimizedImages,
-      total: optimizedImages.length,
+      total: totalCount || 0,
+      returned: optimizedImages.length,
+      limit,
+      offset,
+      hasMore: totalCount ? (offset + limit < totalCount) : false,
       webp_optimized_count: optimizedImages.filter(img => img.webp_optimized).length
     })
   } catch (error) {
