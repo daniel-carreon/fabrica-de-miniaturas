@@ -1,6 +1,8 @@
 
 # Fábrica de Miniaturas - Generador de Imágenes IA Full Stack
 
+NOTA: Todo este resumen fue generado por IA. No necesitas saber nada de programación, pero te invito a ser proactivo y a hacerle las preguntas correctas a la IA. Intenté simplificar el proceso de configuración, aún así requerirás un poco de esfuerzo echarlo a andar. Una vez logrado, tendrás una maquina trabajando por ti cuando lo necesites.
+
 Una aplicación web full stack para generar, gestionar y optimizar imágenes personalizadas usando modelos de IA fine-tuneados. Diseñada para creators de contenido que necesitan generar múltiples variaciones de imágenes de forma eficiente.
 
 ---
