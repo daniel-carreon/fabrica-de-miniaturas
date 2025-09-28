@@ -74,42 +74,45 @@ daniel-flux-context/
 
 ---
 
-## ⚡ **Quick Start**
+## 🚀 **INSTALACIÓN EN 3 PASOS (YouTube Lead Magnet)**
 
-### **1. Setup Backend**
+### **PASO 1: Configurar tus APIs** ⚙️
 ```bash
-# Crear entorno virtual
-cd backend
-python -m venv venv
-source venv/bin/activate  # En Windows: venv\Scripts\activate
+# 1. Copia el template de configuración
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
 
-# Instalar dependencias
-pip install -r requirements.txt
+# 2. Edita backend/.env con ESTOS 4 valores:
+# - REPLICATE_API_TOKEN (obtén en: https://replicate.com/account/api-tokens)
+# - OPENROUTER_API_KEY (obtén en: https://openrouter.ai/keys)
+# - DEFAULT_MODEL=tu-usuario/tu-modelo
+# - SUPABASE_URL + SUPABASE_ANON_KEY (crea gratis en: https://supabase.com)
 
-# Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus tokens
+# 3. Copia los MISMOS valores a frontend/.env.local
 
-# Ejecutar servidor de desarrollo
-uvicorn main:app --reload
+# 4. CRÍTICO - Configura Supabase:
+# Ve a https://supabase.com/dashboard > Tu Proyecto > SQL Editor
+# Copia y pega TODO el archivo setup_supabase.sql y ejecuta
+# Luego: Storage > Create Bucket llamado "images" (público)
 ```
 
-### **2. Setup Frontend**
+### **PASO 2: Instalar dependencias** 📦
 ```bash
-cd frontend
-npm install
-npm run dev
+# Backend
+cd backend && pip install -r requirements.txt
+
+# Frontend
+cd frontend && npm install
 ```
 
-### **3. Configurar Supabase**
+### **PASO 3: Iniciar todo automáticamente** 🚀
 ```bash
-# Instalar Supabase CLI
-npm install -g supabase
-
-# Inicializar proyecto
-supabase init
-supabase start
+# Desde la raíz del proyecto:
+./start.sh    # Mac/Linux
+# O manual: cd backend && uvicorn main:app --reload & cd frontend && npm run dev
 ```
+
+**¡Listo!** Tu generador personal estará en `http://localhost:3000` 🎉
 
 ---
 
