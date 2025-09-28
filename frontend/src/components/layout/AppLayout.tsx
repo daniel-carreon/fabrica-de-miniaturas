@@ -82,10 +82,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <h1 className="text-xl md:text-3xl font-bold text-white purple-glow">
-                    🎯 Daniel Flux Context
+                    🏭 Fábrica de Miniaturas
                   </h1>
                   <p className="text-xs md:text-sm text-purple-200 mt-1 hidden sm:block">
-                    AI-powered image generation for YouTube thumbnails
+                    Generador de imágenes impulsado por IA
                   </p>
                 </div>
 

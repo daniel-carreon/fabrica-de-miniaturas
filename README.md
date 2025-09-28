@@ -1,5 +1,5 @@
 
-# Daniel Flux Context - Generador de Imágenes IA Full Stack
+# Fábrica de Miniaturas - Generador de Imágenes IA Full Stack
 
 Una aplicación web full stack para generar, gestionar y optimizar imágenes personalizadas usando modelos de IA fine-tuneados. Diseñada para creators de contenido que necesitan generar múltiples variaciones de imágenes de forma eficiente.
 
