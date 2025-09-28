@@ -4,15 +4,20 @@ import sys
 import requests
 from PIL import Image
 from io import BytesIO
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # --- Parámetros ---
 API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
-MODEL_VERSION = "daniel-carreon/danielcarreong:56c9356f9c4f271e294b8533b398f318881f02e1568e4733fc6cacfad1a759bc"
+MODEL_VERSION = f"{os.getenv('DEFAULT_MODEL')}:{os.getenv('DEFAULT_VERSION')}"
+TRIGGER_WORD = os.getenv("TRIGGER_WORD", "USER")
 # Directorio de salida actualizado
 OUTPUT_DIR = "output/generacion_ai_thumbnail"
 
 # --- Prompt Base ---
-BASE_PROMPT = "Medium close-up shot of DANI, framed from the chest up, for a YouTube thumbnail about AI technology. He is wearing a smart, professional blazer. The background is a modern, minimalist tech office. The image is ultra-sharp, 8k, with cinematic, dramatic lighting."
+BASE_PROMPT = f"Medium close-up shot of {TRIGGER_WORD}, framed from the chest up, for a YouTube thumbnail about AI technology. He is wearing a smart, professional blazer. The background is a modern, minimalist tech office. The image is ultra-sharp, 8k, with cinematic, dramatic lighting."
 
 # --- 10 Variaciones Sutiles ---
 PROMPTS = [

@@ -55,10 +55,10 @@ daniel-flux-context/
 
 ## 🔥 **Configuración del Modelo IA**
 
-### **Replicate Model Fine-Tuned**
-- **Modelo:** `daniel-carreon/danielcarreong`
-- **Version ID:** `56c9356f9c4f271e294b8533b398f318881f02e1568e4733fc6cacfad1a759bc`
-- **Trigger Word:** `DANI`
+### **Tu Modelo Personalizado Fine-Tuned**
+- **Modelo:** `tu-usuario/tu-modelo` (configurable en .env)
+- **Version ID:** `tu_version_hash` (configurable en .env)
+- **Trigger Word:** `TU_TRIGGER` (configurable en .env)
 - **Optimizado para:** Retratos personalizados y contenido de YouTube
 
 ### **Parámetros Optimizados**

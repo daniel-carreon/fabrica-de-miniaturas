@@ -507,32 +507,121 @@ export default function HomePage() {
     try {
       console.log('⬇️ Downloading image:', image.id)
 
-      // Fetch the image from the URL
-      const response = await fetch(image.url)
-      const blob = await response.blob()
-
-      // Create a download link
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-
       // Create a filename based on the prompt (cleaned up)
-      const cleanPrompt = image.prompt.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50)
-      link.download = `dani_${cleanPrompt}_${image.id}.webp`
+      const cleanPrompt = image.prompt.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 30)
+      const timestamp = new Date().toISOString().slice(0, 10)
+      const filename = `${cleanPrompt}_${timestamp}.webp`
 
-      // Trigger download
+      // 🚀 ESTRATEGIA MÚLTIPLE para máxima compatibilidad
+
+      // Strategy 1: Try direct download with proper headers
+      try {
+        const response = await fetch(image.url, {
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: {
+            'Accept': 'image/webp,image/*,*/*;q=0.8'
+          }
+        })
+
+        if (response.ok) {
+          const blob = await response.blob()
+
+          // Use modern download API if available
+          if ('showSaveFilePicker' in window) {
+            // @ts-ignore - Modern File System Access API
+            const fileHandle = await window.showSaveFilePicker({
+              suggestedName: filename,
+              types: [{
+                description: 'WebP images',
+                accept: { 'image/webp': ['.webp'] }
+              }]
+            })
+            const writable = await fileHandle.createWritable()
+            await writable.write(blob)
+            await writable.close()
+
+            console.log('✅ Modern download API successful')
+            showSuccessNotification('Download completed!')
+            return
+          }
+
+          // Fallback to traditional blob download
+          const downloadUrl = window.URL.createObjectURL(blob)
+          triggerDownload(downloadUrl, filename)
+          setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000)
+
+          console.log('✅ Blob download successful')
+          showSuccessNotification('Download started!')
+          return
+        }
+      } catch (fetchError) {
+        console.warn('Fetch failed, trying fallback:', fetchError)
+      }
+
+      // Strategy 2: Direct link approach with aggressive download attributes
+      console.log('Using direct link fallback strategy')
+      const link = document.createElement('a')
+      link.href = image.url
+      link.download = filename
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+
+      // Force download behavior
+      link.style.display = 'none'
+      link.setAttribute('download', filename)
+
       document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
 
-      // Clean up
-      window.URL.revokeObjectURL(url)
+      // Use setTimeout to ensure proper event handling
+      setTimeout(() => {
+        link.click()
+        setTimeout(() => {
+          document.body.removeChild(link)
+        }, 100)
+      }, 10)
 
-      console.log('✅ Image downloaded successfully')
+      console.log('✅ Direct link download initiated')
+      showSuccessNotification('Download initiated!')
+
     } catch (error) {
-      console.error('❌ Failed to download image:', error)
-      alert(`❌ Failed to download: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.error('❌ All download strategies failed:', error)
+
+      // Final fallback: open in new tab with instructions
+      window.open(image.url, '_blank')
+      showErrorNotification('Download failed. Image opened in new tab - right click to save.')
     }
+  }
+
+  // Helper function to trigger download
+  const triggerDownload = (url: string, filename: string) => {
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.style.display = 'none'
+
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // Helper function to show success notification
+  const showSuccessNotification = (message: string) => {
+    const notification = document.createElement('div')
+    notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in'
+    notification.textContent = `✅ ${message}`
+    document.body.appendChild(notification)
+    setTimeout(() => notification.remove(), 3000)
+  }
+
+  // Helper function to show error notification
+  const showErrorNotification = (message: string) => {
+    const notification = document.createElement('div')
+    notification.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in'
+    notification.textContent = `❌ ${message}`
+    document.body.appendChild(notification)
+    setTimeout(() => notification.remove(), 3000)
   }
 
   const handleDeleteSelected = async () => {
