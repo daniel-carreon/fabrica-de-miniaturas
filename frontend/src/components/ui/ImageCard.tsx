@@ -74,17 +74,37 @@ export default function ImageCard({
     setImageError(true)
   }
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (onDownload) {
-      // Use the robust download function passed as prop
-      onDownload({ id, url, prompt: prompt || `Image ${id}` })
-    } else {
-      // Fallback to simple download
+
+    // Always use the new /api/download endpoint for proper JPG conversion
+    try {
+      console.log(`🔽 Starting download for image ${id} from source: ${source}`)
+
+      // Create download URL with proper parameters
+      const downloadUrl = `/api/download?id=${encodeURIComponent(id)}&source=${encodeURIComponent(source)}`
+
+      // Create a temporary link and trigger download
       const link = document.createElement('a')
-      link.href = url
-      link.download = `image-${id}.png`
+      link.href = downloadUrl
+      link.style.display = 'none'
+      document.body.appendChild(link)
       link.click()
+      document.body.removeChild(link)
+
+      console.log(`✅ Download initiated for image ${id}`)
+    } catch (error) {
+      console.error('❌ Error downloading image:', error)
+
+      // Fallback to original method if new endpoint fails
+      if (onDownload) {
+        onDownload({ id, url, prompt: prompt || `Image ${id}` })
+      } else {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `image-${id}.jpg`
+        link.click()
+      }
     }
   }
 
