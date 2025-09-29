@@ -122,3 +122,7 @@ backend/migrations/versions/*
 # Jupyter Notebooks
 .ipynb_checkpoints
 .vercel
+
+# MCP Configuration (contains sensitive tokens)
+.mcp.json
+mcp.json
