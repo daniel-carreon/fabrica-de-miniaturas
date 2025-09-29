@@ -763,11 +763,11 @@ export default function HomePage() {
         <GlassCard variant="dark" className="purple-glow">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white">
-              🎨 Generated Images (Create from Scratch) ({(Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'create_from_scratch') : []).length})
+              🎨 Generated Images (Create from Scratch) ({(Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'create_from_scratch') : []).length + (Array.isArray(createdHistory) ? createdHistory.length : 0)})
             </h2>
           </div>
 
-          {(Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'create_from_scratch') : []).length === 0 ? (
+          {(Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'create_from_scratch') : []).length === 0 && (Array.isArray(createdHistory) ? createdHistory.length : 0) === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">🎨</div>
               <h3 className="text-lg font-medium text-white mb-2">No generated images yet</h3>
