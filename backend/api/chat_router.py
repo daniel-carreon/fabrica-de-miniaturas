@@ -127,8 +127,8 @@ TOOLS = [
 {
     "type": "function",
     "function": {
-        "name": "generate_images",
-        "description": "Generate personalized images using the DANI fine-tuned model",
+        "name": "generate_avatar",
+        "description": "Generate personalized avatar images using the DANI fine-tuned model (for portraits with Daniel's identity)",
         "parameters": {
             "type": "object",
             "properties": {
@@ -143,7 +143,7 @@ TOOLS = [
     "type": "function",
     "function": {
         "name": "create_images",
-        "description": "Create images from scratch using AI without any avatar or specific person (general image generation)",
+        "description": "Create general images from scratch without specific identity (landscapes, objects, scenes, thumbnails, artwork - use when NO \"DANI\" mentioned)",
         "parameters": {
             "type": "object",
             "properties": {
@@ -289,12 +289,14 @@ class ImageParameterMapper:
         return enhanced_prompt
 
 async def translate_to_english(text: str) -> str:
-    """Translate Spanish text to English using GPT-5-mini"""
+    """Smart translation: Translate Spanish instructions but preserve Spanish text in quotes for thumbnails"""
     # Simple detection - if contains Spanish words, translate
     spanish_indicators = ['imagen', 'imagenes', 'genera', 'generame', 'combina', 'mezcla', 'fusiona', 'miniatura', 'fondo', 'texto', 'estilo', 'con', 'para', 'que', 'una', 'unas', 'estas', 'este']
 
     if any(word in text.lower() for word in spanish_indicators):
-        logger.info(f"🌍 Detected Spanish, translating: '{text[:50]}...'")
+        # Check if it's a thumbnail/miniatura context
+        is_thumbnail = 'miniatura' in text.lower() or 'thumbnail' in text.lower()
+        logger.info(f"🌍 Detected Spanish{'(thumbnail context)' if is_thumbnail else ''}, smart translating: '{text[:50]}...'")
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -303,12 +305,12 @@ async def translate_to_english(text: str) -> str:
                     'Authorization': f'Bearer {OPENROUTER_API_KEY}',
                     'Content-Type': 'application/json',
                     'HTTP-Referer': FRONTEND_URL,
-                    'X-Title': 'Daniel Flux Context - Translator'
+                    'X-Title': 'Daniel Flux Context - Smart Translator'
                 },
                 json={
-                    "model": "openai/gpt-4o",  # Using stable model instead of gpt-5
+                    "model": "openai/gpt-4o",
                     "messages": [
-                        {"role": "system", "content": "Translate the following Spanish text to English. Keep technical terms, names, and specific instructions intact. Only return the translation, no explanations."},
+                        {"role": "system", "content": "Translate Spanish instructions to English but PRESERVE Spanish text that should appear in the final image. Rules: 1) Translate instructions/descriptions 2) KEEP Spanish text in quotes EXACTLY as written 3) For thumbnails/miniaturas, preserve display text in Spanish. Example: 'miniatura con texto \"APRENDE PYTHON\"' → 'thumbnail with text \"APRENDE PYTHON\"' (Spanish text preserved). Only return the translation."},
                         {"role": "user", "content": text}
                     ],
                     "max_tokens": 500,
@@ -319,7 +321,7 @@ async def translate_to_english(text: str) -> str:
             response.raise_for_status()
             result = response.json()
             translated = result.get("choices", [{}])[0].get("message", {}).get("content", text)
-            logger.info(f"✅ Translated to: '{translated[:50]}...'")
+            logger.info(f"✅ Smart translated to: '{translated[:50]}...'")
             return translated.strip()
 
     return text
@@ -495,28 +497,66 @@ async def call_create_images_api(prompt: str, style: str = "photorealistic", num
             images = []
             if result.get("choices") and len(result["choices"]) > 0:
                 message = result["choices"][0].get("message", {})
+                logger.info(f"🔍 Debug - Message received with keys: {list(message.keys())}")
 
-                # Check for images in the response
-                if message.get("content"):
+                # Check for images in multiple locations (same logic as combine_images)
+                image_url = None
+
+                # First check: message.images (primary location)
+                if message.get("images"):
+                    logger.info(f"🔍 Debug - Found images in message.images")
+                    image_data = message["images"][0]
+                    image_url = image_data.get("image_url", {}).get("url")
+                # Second check: message.content array
+                elif message.get("content"):
                     content = message["content"]
-                    if isinstance(content, list):
-                        for item in content:
-                            if item.get("type") == "image":
-                                image_url = item.get("source", {}).get("url") or item.get("image_url", {}).get("url")
-                                if image_url:
-                                    images.append({
-                                        "id": f"created_{int(time.time())}_{len(images)}",
-                                        "url": image_url,
-                                        "prompt": prompt,
-                                        "timestamp": int(time.time() * 1000),
-                                        "source": "create_from_scratch"
-                                    })
+                    logger.info(f"🔍 Debug - Content type: {type(content)}")
 
-                    # Duplicate images to reach requested count (simple approach)
-                    while len(images) < num_images and len(images) > 0:
-                        base_image = images[0].copy()
-                        base_image["id"] = f"created_{int(time.time())}_{len(images)}"
-                        images.append(base_image)
+                    if isinstance(content, list):
+                        logger.info(f"🔍 Debug - Content is array with {len(content)} items")
+                        for i, item in enumerate(content):
+                            logger.info(f"🔍 Debug - Item {i}: type={item.get('type')}")
+                            if item.get("type") == "image":
+                                logger.info(f"🔍 Debug - Found image in content array")
+                                image_url = item.get("source", {}).get("url") or item.get("image_url", {}).get("url")
+                                break
+                    elif isinstance(content, str):
+                        logger.warning(f"🔍 Debug - Content is text only: {content[:100]}...")
+                        # Gemini returned only text, no image generated
+                        raise ValueError(f"Nano Banana returned text only, no image generated: {content[:200]}...")
+                    else:
+                        logger.error(f"🔍 Debug - Unexpected content format: {type(content)}")
+                        raise ValueError(f"Unexpected content format: {type(content)}")
+                else:
+                    logger.error(f"🔍 Debug - No content or images found. Message keys: {list(message.keys())}")
+                    raise ValueError("No content or images found in response")
+
+                if image_url:
+                    images.append({
+                        "id": f"created_{int(time.time())}_{len(images)}",
+                        "url": image_url,
+                        "prompt": prompt,
+                        "timestamp": int(time.time() * 1000),
+                        "source": "create_from_scratch"
+                    })
+                    logger.info(f"✅ Successfully extracted image URL: {image_url[:100]}...")
+                else:
+                    logger.warning("⚠️ No image URL found in response")
+
+                # Generate multiple variations if requested and we have a valid image
+                if image_url and num_images > 1:
+                    logger.info(f"🔄 Creating {num_images-1} additional variations...")
+                    # For now, duplicate the single generated image
+                    # TODO: In future, call API multiple times for true variations
+                    for i in range(1, num_images):
+                        variation = {
+                            "id": f"created_{int(time.time())}_{i}",
+                            "url": image_url,
+                            "prompt": prompt,
+                            "timestamp": int(time.time() * 1000),
+                            "source": "create_from_scratch"
+                        }
+                        images.append(variation)
 
             if len(images) == 0:
                 # Fallback: create placeholder response
@@ -938,7 +978,10 @@ async def chat_endpoint(request: ChatRequest):
         # Check for tool calls
         if response_msg.get("tool_calls"):
             tool_call = response_msg["tool_calls"][0]
-            if tool_call["function"]["name"] == "generate_images":
+            tool_name = tool_call["function"]["name"]
+            logger.info(f"🎯 Agent selected tool: {tool_name}")
+
+            if tool_name == "generate_avatar":
                 try:
                     # Parse tool arguments
                     raw_args = tool_call["function"]["arguments"]
@@ -963,7 +1006,7 @@ async def chat_endpoint(request: ChatRequest):
 
                     return ChatResponse(
                         response=f"✨ Generated {result['total']} images with DANI prompt '{args['prompt'][:100]}...' Check the gallery! 🎨",
-                        tool_used="generate_images",
+                        tool_used="generate_avatar",
                         tool_result=result,
                         usage=data.get("usage"),
                         model=data.get("model"),
@@ -972,7 +1015,7 @@ async def chat_endpoint(request: ChatRequest):
                 except Exception as e:
                     return ChatResponse(response=f"❌ Error generating images: {str(e)}", reasoning_details=reasoning_details)
 
-            elif tool_call["function"]["name"] == "create_images":
+            elif tool_name == "create_images":
                 try:
                     # Parse tool arguments
                     raw_args = tool_call["function"]["arguments"]
@@ -1006,7 +1049,7 @@ async def chat_endpoint(request: ChatRequest):
                 except Exception as e:
                     return ChatResponse(response=f"❌ Error creating images: {str(e)}", reasoning_details=reasoning_details)
 
-            elif tool_call["function"]["name"] == "combine_images":
+            elif tool_name == "combine_images":
                 try:
                     # Parse tool arguments
                     raw_args = tool_call["function"]["arguments"]

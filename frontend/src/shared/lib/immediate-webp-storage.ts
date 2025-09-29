@@ -22,11 +22,12 @@ interface ProcessedImage {
 }
 
 interface ProcessImageOptions {
-  type: 'generated' | 'combined'
+  type: 'generated' | 'combined' | 'created'
   metadata?: {
     modelVersion?: string
     session?: string
     sourceImages?: string[]
+    tool_used?: string
   }
 }
 
@@ -132,7 +133,7 @@ async function convertBlobToWebP(originalBlob: Blob): Promise<Blob> {
 /**
  * Generate organized storage path
  */
-function generateStoragePath(type: 'generated' | 'combined', imageId: string): string {
+function generateStoragePath(type: 'generated' | 'combined' | 'created', imageId: string): string {
   const timestamp = new Date().toISOString().split('T')[0] // YYYY-MM-DD
   const randomSuffix = Math.random().toString(36).substr(2, 6)
 
@@ -141,6 +142,8 @@ function generateStoragePath(type: 'generated' | 'combined', imageId: string): s
       return `generated/webp/${timestamp}/${imageId}_${randomSuffix}.webp`
     case 'combined':
       return `combined/webp/${timestamp}/${imageId}_${randomSuffix}.webp`
+    case 'created':
+      return `created/webp/${timestamp}/${imageId}_${randomSuffix}.webp`
     default:
       return `unknown/webp/${timestamp}/${imageId}_${randomSuffix}.webp`
   }

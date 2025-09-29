@@ -12,6 +12,7 @@ interface ImageCardProps {
   metadata?: any
   onDelete?: (id: string) => void
   onToggleFavorite?: (id: string) => void
+  onDownload?: (image: { id: string; url: string; prompt: string }) => void
   isFavorite?: boolean
   disabled?: boolean
 }
@@ -24,6 +25,7 @@ export default function ImageCard({
   metadata,
   onDelete,
   onToggleFavorite,
+  onDownload,
   isFavorite = false,
   disabled = false
 }: ImageCardProps) {
@@ -74,10 +76,16 @@ export default function ImageCard({
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation()
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `image-${id}.png`
-    link.click()
+    if (onDownload) {
+      // Use the robust download function passed as prop
+      onDownload({ id, url, prompt: prompt || `Image ${id}` })
+    } else {
+      // Fallback to simple download
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `image-${id}.png`
+      link.click()
+    }
   }
 
   return (

@@ -84,13 +84,15 @@ export default function HomePage() {
   const [favorites, setFavorites] = useState<FavoriteImage[]>([])
   const [generatedHistory, setGeneratedHistory] = useState<GeneratedImage[]>([])
   const [combinedHistory, setCombinedHistory] = useState<CombinedImage[]>([])
+  const [createdHistory, setCreatedHistory] = useState<any[]>([])
   const [uploads, setUploads] = useState<UserUpload[]>([])
-  const [loading, setLoading] = useState({ favorites: false, generated: false, combined: false, uploads: false })
+  const [loading, setLoading] = useState({ favorites: false, generated: false, combined: false, created: false, uploads: false })
 
   // Pagination states
   const [paginationState, setPaginationState] = useState({
     generated: { limit: 100, offset: 0, total: 0, hasMore: false },
-    combined: { limit: 100, offset: 0, total: 0, hasMore: false }
+    combined: { limit: 100, offset: 0, total: 0, hasMore: false },
+    created: { limit: 100, offset: 0, total: 0, hasMore: false }
   })
 
   // Upload states
@@ -119,7 +121,7 @@ export default function HomePage() {
       id: 'generated',
       label: 'Generated',
       icon: '🎨',
-      count: (Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'create_from_scratch') : []).length,
+      count: (Array.isArray(generatedImages) ? generatedImages.filter((img: any) => img.source === 'create_from_scratch') : []).length + (Array.isArray(createdHistory) ? createdHistory.length : 0),
       color: 'from-emerald-600 to-teal-600'
     },
     {
@@ -189,16 +191,20 @@ export default function HomePage() {
 
   // 🔄 Listen for image updates from ChatAgent and reload appropriately
   useEffect(() => {
-    const handleImagesUpdated = (event: CustomEvent) => {
-      const { type, endpoint, count } = event.detail
+    const handleImagesUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const { type, endpoint, count } = customEvent.detail
       console.log(`🔄 Received reload event: ${type} (${count} images from ${endpoint})`)
 
       if (type === 'combine_images') {
         console.log('🔄 Reloading combined images after auto-save...')
         loadCombinedHistory()
-      } else if (type === 'generate_images') {
-        console.log('🔄 Reloading generated images after auto-save...')
+      } else if (type === 'generate_avatar') {
+        console.log('🔄 Reloading avatar images after auto-save...')
         loadGeneratedHistory()
+      } else if (type === 'create_images') {
+        console.log('🔄 Reloading created images after auto-save...')
+        loadCreatedHistory()
       }
     }
 
@@ -211,6 +217,7 @@ export default function HomePage() {
       loadFavorites(),
       loadGeneratedHistory(),
       loadCombinedHistory(),
+      loadCreatedHistory(),
       loadUploads()
     ])
   }
@@ -291,6 +298,38 @@ export default function HomePage() {
       console.error('Error loading combined history:', error)
     } finally {
       setLoading(prev => ({ ...prev, combined: false }))
+    }
+  }
+
+  const loadCreatedHistory = async (append = false) => {
+    try {
+      setLoading(prev => ({ ...prev, created: true }))
+      const currentState = paginationState.created
+      const offset = append ? currentState.offset + currentState.limit : 0
+
+      const response = await fetch(`/api/created?limit=${currentState.limit}&offset=${offset}`)
+      const data = await response.json()
+      if (response.ok) {
+        if (append) {
+          setCreatedHistory(prev => [...prev, ...(data.images || [])])
+        } else {
+          setCreatedHistory(data.images || [])
+        }
+
+        setPaginationState(prev => ({
+          ...prev,
+          created: {
+            ...prev.created,
+            offset: offset,
+            total: data.total || 0,
+            hasMore: data.hasMore || false
+          }
+        }))
+      }
+    } catch (error) {
+      console.error('Error loading created history:', error)
+    } finally {
+      setLoading(prev => ({ ...prev, created: false }))
     }
   }
 
@@ -505,124 +544,40 @@ export default function HomePage() {
 
   const handleDownloadImage = async (image: { id: string; url: string; prompt: string }) => {
     try {
-      console.log('⬇️ Downloading image:', image.id)
-
-      // Create a filename based on the prompt (cleaned up)
+      // Simple filename based on prompt
       const cleanPrompt = image.prompt.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 30)
       const timestamp = new Date().toISOString().slice(0, 10)
       const filename = `${cleanPrompt}_${timestamp}.webp`
 
-      // 🚀 ESTRATEGIA MÚLTIPLE para máxima compatibilidad
+      // Simple strategy: fetch + blob + direct download
+      const response = await fetch(image.url)
+      const blob = await response.blob()
 
-      // Strategy 1: Try direct download with proper headers
-      try {
-        const response = await fetch(image.url, {
-          method: 'GET',
-          mode: 'cors',
-          credentials: 'omit',
-          headers: {
-            'Accept': 'image/webp,image/*,*/*;q=0.8'
-          }
-        })
-
-        if (response.ok) {
-          const blob = await response.blob()
-
-          // Use modern download API if available
-          if ('showSaveFilePicker' in window) {
-            // @ts-ignore - Modern File System Access API
-            const fileHandle = await window.showSaveFilePicker({
-              suggestedName: filename,
-              types: [{
-                description: 'WebP images',
-                accept: { 'image/webp': ['.webp'] }
-              }]
-            })
-            const writable = await fileHandle.createWritable()
-            await writable.write(blob)
-            await writable.close()
-
-            console.log('✅ Modern download API successful')
-            showSuccessNotification('Download completed!')
-            return
-          }
-
-          // Fallback to traditional blob download
-          const downloadUrl = window.URL.createObjectURL(blob)
-          triggerDownload(downloadUrl, filename)
-          setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000)
-
-          console.log('✅ Blob download successful')
-          showSuccessNotification('Download started!')
-          return
-        }
-      } catch (fetchError) {
-        console.warn('Fetch failed, trying fallback:', fetchError)
-      }
-
-      // Strategy 2: Direct link approach with aggressive download attributes
-      console.log('Using direct link fallback strategy')
+      // Create download URL and trigger download
+      const downloadUrl = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
-      link.href = image.url
+      link.href = downloadUrl
       link.download = filename
-      link.target = '_blank'
-      link.rel = 'noopener noreferrer'
-
-      // Force download behavior
       link.style.display = 'none'
-      link.setAttribute('download', filename)
 
       document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
 
-      // Use setTimeout to ensure proper event handling
-      setTimeout(() => {
-        link.click()
-        setTimeout(() => {
-          document.body.removeChild(link)
-        }, 100)
-      }, 10)
+      // Clean up URL after download
+      setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000)
 
-      console.log('✅ Direct link download initiated')
-      showSuccessNotification('Download initiated!')
-
+      console.log('✅ Download completed:', filename)
     } catch (error) {
-      console.error('❌ All download strategies failed:', error)
-
-      // Final fallback: open in new tab with instructions
-      window.open(image.url, '_blank')
-      showErrorNotification('Download failed. Image opened in new tab - right click to save.')
+      console.error('❌ Download failed:', error)
+      // Simple fallback: direct link
+      const link = document.createElement('a')
+      link.href = image.url
+      link.download = `image_${image.id}.png`
+      link.click()
     }
   }
 
-  // Helper function to trigger download
-  const triggerDownload = (url: string, filename: string) => {
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    link.style.display = 'none'
-
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  // Helper function to show success notification
-  const showSuccessNotification = (message: string) => {
-    const notification = document.createElement('div')
-    notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in'
-    notification.textContent = `✅ ${message}`
-    document.body.appendChild(notification)
-    setTimeout(() => notification.remove(), 3000)
-  }
-
-  // Helper function to show error notification
-  const showErrorNotification = (message: string) => {
-    const notification = document.createElement('div')
-    notification.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in'
-    notification.textContent = `❌ ${message}`
-    document.body.appendChild(notification)
-    setTimeout(() => notification.remove(), 3000)
-  }
 
   const handleDeleteSelected = async () => {
     if (!Array.isArray(selectedImages) || selectedImages.length === 0) return
@@ -641,12 +596,25 @@ export default function HomePage() {
           setGeneratedImages(filteredImages)
         }
 
-        // Delete from database for historical images
-        const deletePromises = selectedIds.map(id =>
-          fetch(`/api/generated?id=${id}`, { method: 'DELETE' }).catch(err =>
-            console.warn(`Failed to delete ${id}:`, err)
+        // Delete from database - use correct endpoint based on active tab
+        let deletePromises
+        if (activeTab === 'combined') {
+          // For combined tab: use /api/combined endpoint and update combinedHistory
+          deletePromises = selectedIds.map(id =>
+            fetch(`/api/combined?id=${id}`, { method: 'DELETE' }).catch(err =>
+              console.warn(`Failed to delete combined image ${id}:`, err)
+            )
           )
-        )
+          // Update combinedHistory state immediately
+          setCombinedHistory(prev => prev.filter(img => !selectedIds.includes(img.id)))
+        } else {
+          // For other tabs: use /api/generated endpoint (original logic)
+          deletePromises = selectedIds.map(id =>
+            fetch(`/api/generated?id=${id}`, { method: 'DELETE' }).catch(err =>
+              console.warn(`Failed to delete generated image ${id}:`, err)
+            )
+          )
+        }
         await Promise.all(deletePromises)
 
         // Delete from favorites if any
@@ -821,6 +789,7 @@ export default function HomePage() {
                     model: 'AI Generated (No Avatar)',
                     type: 'Created from Scratch'
                   }}
+                  onDownload={handleDownloadImage}
                   onToggleFavorite={(id) => {
                     const imageToSave = Array.isArray(generatedImages) ? generatedImages.find(img => img.id === id) : null
                     if (imageToSave) handleSaveFavorite(imageToSave)
@@ -834,6 +803,51 @@ export default function HomePage() {
                         setGeneratedImages(filteredImages)
                       } catch (error) {
                         console.error('Error deleting generated image:', error)
+                      }
+                    }
+                  }}
+                />
+              ))}
+
+              {/* Historical created images from database */}
+              {createdHistory.map((historyImage) => (
+                <ImageCard
+                  key={`created-history-${historyImage.id}`}
+                  id={historyImage.id}
+                  url={historyImage.supabase_url || historyImage.source_url}
+                  source="generated"
+                  prompt={historyImage.creation_prompt}
+                  metadata={{
+                    timestamp: new Date(historyImage.created_at).toLocaleString(),
+                    model: 'Gemini 2.5 Flash',
+                    type: 'Created from Scratch',
+                    session: historyImage.creation_session,
+                    webp_optimized: historyImage.webp_optimized
+                  }}
+                  onDownload={handleDownloadImage}
+                  onToggleFavorite={async (id) => {
+                    const imageToSave = {
+                      id: historyImage.image_id,
+                      url: historyImage.supabase_url || historyImage.source_url,
+                      prompt: historyImage.creation_prompt,
+                      isSelected: false,
+                      createdAt: new Date(historyImage.created_at)
+                    }
+                    await handleSaveFavorite(imageToSave)
+                  }}
+                  onDelete={async (id) => {
+                    if (!combineMode && selectedImages.length > 0) {
+                      // In delete mode with selections, delete all selected
+                      handleDeleteSelected()
+                    } else {
+                      // In combine mode or no selections, delete just this one
+                      try {
+                        const response = await fetch(`/api/created?id=${id}`, { method: 'DELETE' })
+                        if (response.ok) {
+                          setCreatedHistory(prev => prev.filter(img => img.id !== id))
+                        }
+                      } catch (error) {
+                        console.error('Error deleting created history image:', error)
                       }
                     }
                   }}
@@ -1011,6 +1025,7 @@ export default function HomePage() {
                   session: historyImage.generation_session,
                   webp_optimized: historyImage.webp_optimized
                 }}
+                onDownload={handleDownloadImage}
                 onToggleFavorite={async (id) => {
                   const imageToSave = {
                     id: historyImage.image_id,
@@ -1117,6 +1132,7 @@ export default function HomePage() {
                     model: 'Nano Banana (Gemini 2.5 Flash)',
                     type: 'AI Combined'
                   }}
+                  onDownload={handleDownloadImage}
                   onToggleFavorite={(id) => {
                     const imageToSave = Array.isArray(generatedImages) ? generatedImages.find(img => img.id === id) : null
                     if (imageToSave) handleSaveFavorite(imageToSave)
@@ -1157,6 +1173,7 @@ export default function HomePage() {
                     webp_optimized: historyImage.webp_optimized,
                     source_images_count: historyImage.source_images?.length || 0
                   }}
+                  onDownload={handleDownloadImage}
                   onToggleFavorite={async (id) => {
                     const imageToSave = {
                       id: historyImage.image_id,
@@ -1224,6 +1241,7 @@ export default function HomePage() {
                     savedAt: new Date(favorite.saved_at).toLocaleDateString(),
                     originalModel: favorite.model_version || 'Unknown'
                   }}
+                  onDownload={handleDownloadImage}
                   onDelete={async (id) => {
                     if (!combineMode && selectedImages.length > 0) {
                       // In delete mode with selections, delete all selected
@@ -1344,6 +1362,7 @@ export default function HomePage() {
                     uploadedAt: new Date(upload.uploaded_at).toLocaleDateString(),
                     tags: upload.tags.join(', ') || 'No tags'
                   }}
+                  onDownload={handleDownloadImage}
                   onDelete={(id) => {
                     if (!combineMode && selectedImages.length > 0) {
                       // In delete mode with selections, delete all selected

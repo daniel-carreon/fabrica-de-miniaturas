@@ -89,7 +89,7 @@ export default function ChatAgent() {
       console.log('✅ OpenRouter response:', data)
 
       // If tool was used and returned images, add them to gallery
-      if ((data.tool_used === 'generate_images' || data.tool_used === 'combine_images') && data.tool_result?.images) {
+      if ((data.tool_used === 'generate_avatar' || data.tool_used === 'create_images' || data.tool_used === 'combine_images') && data.tool_result?.images) {
         console.log(`🎨 Processing ${data.tool_used} images from chat tool:`, data.tool_result)
 
         // Transform tool_result images to imageStore format with source marking
@@ -99,7 +99,8 @@ export default function ChatAgent() {
           prompt: img.prompt,
           isSelected: false,
           createdAt: new Date(img.timestamp),
-          source: data.tool_used === 'generate_images' ? 'flux_dani' : 'nano_banana'
+          source: data.tool_used === 'generate_avatar' ? 'flux_dani' :
+                  data.tool_used === 'create_images' ? 'create_from_scratch' : 'nano_banana'
         }))
 
         // DON'T add images to store here - let page.tsx handle display after auto-save
@@ -112,21 +113,35 @@ export default function ChatAgent() {
         }
 
         // Auto-save images to correct endpoint based on tool used
-        if (data.tool_used === 'generate_images' || data.tool_used === 'combine_images') {
+        if (data.tool_used === 'generate_avatar' || data.tool_used === 'create_images' || data.tool_used === 'combine_images') {
           try {
             // 🎯 ROUTING CORRECTO: usar endpoint específico según tool_used
-            const endpoint = data.tool_used === 'combine_images' ? '/api/combined' : '/api/generated'
-            const logType = data.tool_used === 'combine_images' ? 'combined images' : 'generated images'
+            const endpoint = data.tool_used === 'combine_images' ? '/api/combined' :
+                           data.tool_used === 'create_images' ? '/api/created' : '/api/generated'
+            const logType = data.tool_used === 'combine_images' ? 'combined images' :
+                          data.tool_used === 'create_images' ? 'created images' : 'generated images'
 
             console.log(`💾 Auto-saving ${logType} to ${endpoint}...`)
 
-            // 🔄 Payload específico para combine_images
+            // 🔄 Payload específico según tool_used
             const payload = data.tool_used === 'combine_images'
               ? {
                   images: data.tool_result.images,
                   sourceImages: selectedImages, // Context de imágenes seleccionadas
                   combinationSession: `chat_combine_${Date.now()}`,
                   modelUsed: 'nano-banana'
+                }
+              : data.tool_used === 'create_images'
+              ? {
+                  images: data.tool_result.images,
+                  modelVersion: 'gemini-2.5-flash',
+                  modelParameters: {
+                    tool_used: data.tool_used,
+                    prompt: data.tool_result.prompt,
+                    total: data.tool_result.total
+                  },
+                  generationSession: `chat_create_${Date.now()}`,
+                  toolUsed: data.tool_used
                 }
               : {
                   images: data.tool_result.images,
@@ -136,7 +151,7 @@ export default function ChatAgent() {
                     prompt: data.tool_result.prompt,
                     total: data.tool_result.total
                   },
-                  generationSession: `chat_${Date.now()}`,
+                  generationSession: `chat_avatar_${Date.now()}`,
                   toolUsed: data.tool_used
                 }
 

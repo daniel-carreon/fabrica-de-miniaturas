@@ -36,6 +36,10 @@ export default function ThinkingProcess({
     switch (tool) {
       case 'generate_images':
         return '🎨'
+      case 'generate_avatar':
+        return '👤'
+      case 'create_images':
+        return '🎨'
       case 'combine_images':
         return '🔄'
       default:
@@ -47,6 +51,10 @@ export default function ThinkingProcess({
     switch (tool) {
       case 'generate_images':
         return 'Image Generation'
+      case 'generate_avatar':
+        return 'Avatar Generation'
+      case 'create_images':
+        return 'Create from Scratch'
       case 'combine_images':
         return 'Image Combination'
       default:
