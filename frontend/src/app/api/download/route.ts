@@ -84,7 +84,13 @@ export async function GET(request: NextRequest) {
             .single()
 
           if (data && !error) {
-            return await processImageDownload(data[table.url], data[table.prompt] || 'image', imageId)
+            const record = data as unknown as Record<string, unknown>
+            const webpUrl = record[table.url] as string | undefined
+            const fallbackPrompt = (record[table.prompt] as string | undefined) || 'image'
+
+            if (webpUrl) {
+              return await processImageDownload(webpUrl, fallbackPrompt, imageId)
+            }
           }
         }
       }
@@ -95,8 +101,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const webpUrl = imageData[urlField]
-    const prompt = imageData[promptField] || 'image'
+    const imageRecord = imageData as unknown as Record<string, unknown>
+    const webpUrl = imageRecord[urlField] as string | undefined
+    const prompt = (imageRecord[promptField] as string | undefined) || 'image'
 
     if (!webpUrl) {
       return NextResponse.json(
