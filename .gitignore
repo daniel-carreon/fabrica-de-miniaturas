@@ -25,6 +25,10 @@ frontend/build/
 backend/dist/
 backend/build/
 
+# TypeScript build cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
 # IDE and editor files
 .vscode/
 .idea/
