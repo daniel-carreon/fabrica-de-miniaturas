@@ -4,7 +4,7 @@ import PasswordGate from './password-gate';
 
 export const metadata = {
   title: 'Fábrica de Miniaturas',
-  description: 'AI-powered thumbnail generator',
+  description: 'AI-powered thumbnail generator with DANI LoRA',
   icons: {
     icon: '/favicon.ico',
   },
