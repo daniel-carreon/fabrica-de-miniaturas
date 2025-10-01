@@ -19,13 +19,17 @@ app = FastAPI(
 )
 
 # Configure CORS for frontend - Support multiple fallback ports
+ALLOWED_ORIGINS = [
+    "https://daniel-flux-context.vercel.app",  # Production frontend
+    "https://fabrica-de-miniaturas.vercel.app",  # Production frontend (alternative)
+    # Local development - auto port detection 3000-3006
+    *[f"http://localhost:{port}" for port in range(3000, 3007)],
+    *[f"http://127.0.0.1:{port}" for port in range(3000, 3007)],
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://daniel-flux-context.vercel.app", # Production frontend
-        "http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003",
-        "http://localhost:3004", "http://localhost:3005", "http://localhost:3006"
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

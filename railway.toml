@@ -1,0 +1,15 @@
+# Railway Configuration - Monorepo Setup
+# Fábrica de Miniaturas: Frontend (Next.js) + Backend (FastAPI)
+
+[build]
+builder = "nixpacks"
+buildCommand = "echo 'Building monorepo...'"
+
+[deploy]
+startCommand = "echo 'Deploy from service-specific configs'"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
+# Healthcheck for services
+healthcheckPath = "/health"
+healthcheckTimeout = 100
