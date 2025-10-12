@@ -3,10 +3,25 @@ import AppLayout from '@/components/layout/AppLayout';
 import PasswordGate from './password-gate';
 
 export const metadata = {
-  title: 'Fábrica de Miniaturas',
-  description: 'AI-powered thumbnail generator with DANI LoRA',
+  title: 'Fábrica de Miniaturas - AI Thumbnail Generator',
+  description: 'Generador de miniaturas con IA usando DANI LoRA y herramientas conversacionales',
+  manifest: '/manifest.json',
+  themeColor: '#9D4EDD',
+  viewport: 'width=device-width, initial-scale=1, viewport-fit=cover',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Fábrica',
+  },
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
   },
 };
 
