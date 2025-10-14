@@ -1402,7 +1402,7 @@ export default function HomePage() {
       )}
 
 
-      {/* Simple Image Modal with Scroll */}
+      {/* Mobile-Optimized Image Modal with Scroll */}
       {selectedImage && (
         <div
           className="fixed inset-0 bg-black z-50 overflow-y-auto"
@@ -1411,21 +1411,27 @@ export default function HomePage() {
             setSelectedImageData(null)
           }}
         >
-          {/* Close button - fixed position */}
+          {/* Close button - Touch optimized, larger on mobile */}
           <button
             onClick={() => {
               setSelectedImage(null)
               setSelectedImageData(null)
             }}
-            className="fixed top-6 right-6 bg-red-600/80 hover:bg-red-700/90 text-white w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold transition-colors z-10 border-2 border-white/20 shadow-xl"
+            className="fixed top-4 right-4 md:top-6 md:right-6 bg-red-600/90 hover:bg-red-700/95 active:bg-red-800 text-white w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-xl md:text-2xl font-bold transition-all z-10 border-2 border-white/30 shadow-xl shadow-red-500/30 active:scale-95 touch-manipulation"
+            aria-label="Close modal"
           >
             ✕
           </button>
 
+          {/* Scroll indicator hint - only visible on mobile */}
+          <div className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-purple-600/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-xs font-medium z-10 animate-bounce pointer-events-none">
+            ↓ Scroll para ver detalles
+          </div>
+
           {/* Scrollable content */}
           <div className="min-h-screen flex flex-col">
             {/* Image - takes full viewport height */}
-            <div className="h-screen flex items-center justify-center p-4">
+            <div className="h-screen flex items-center justify-center p-2 md:p-4">
               <img
                 src={selectedImage}
                 alt={selectedImageData?.prompt || "Imagen ampliada"}

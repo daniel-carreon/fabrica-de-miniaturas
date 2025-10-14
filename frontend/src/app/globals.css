@@ -4,26 +4,28 @@
 
 @layer base {
   :root {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    /* Negro profundo como base */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 7%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 0 0% 7%;
     --popover-foreground: 0 0% 98%;
-    --primary: 262 83% 58%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217 33% 17%;
+    /* Morado intenso */
+    --primary: 270 91% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 50% 25%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 262 83% 58%;
-    --radius: 0.5rem;
+    --muted: 270 30% 15%;
+    --muted-foreground: 270 10% 70%;
+    --accent: 270 70% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 270 40% 20%;
+    --input: 270 40% 15%;
+    --ring: 270 91% 65%;
+    --radius: 0.75rem;
   }
 
   * {
@@ -31,7 +33,16 @@
   }
 
   body {
-    @apply bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 min-h-screen;
+    @apply min-h-screen;
+    background: linear-gradient(135deg,
+      #0a0a0a 0%,
+      #1a0a2e 15%,
+      #0f0f0f 30%,
+      #1a0a2e 50%,
+      #0a0a0a 70%,
+      #16001e 85%,
+      #0a0a0a 100%
+    );
     color: hsl(var(--foreground));
     background-attachment: fixed;
   }
@@ -47,7 +58,11 @@
   }
 
   .purple-glow {
-    box-shadow: 0 0 50px rgba(139, 92, 246, 0.3);
+    box-shadow:
+      0 0 60px rgba(168, 85, 247, 0.4),
+      0 0 100px rgba(147, 51, 234, 0.2),
+      inset 0 0 30px rgba(168, 85, 247, 0.1);
+    border: 1px solid rgba(168, 85, 247, 0.3);
   }
 
   /* Custom slider styles for configuration panel */
@@ -82,6 +97,20 @@
     cursor: pointer;
     border: 2px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Shimmer animation for image loading */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s infinite linear;
   }
 
   /* Mobile-first responsive design for configuration panel */
@@ -141,23 +170,62 @@
   }
 
   .image-grid {
-    @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 p-4;
+    @apply grid gap-3 p-4;
+    /* Mobile-first adaptive grid */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+
+  /* Responsive grid optimizations */
+  @media (min-width: 640px) {
+    .image-grid {
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 4px;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .image-grid {
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .image-grid {
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .image-grid {
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
   }
 
   .image-card {
-    @apply relative overflow-hidden rounded-lg border border-purple-500/20 backdrop-blur-sm shadow-lg transition-all hover:shadow-xl cursor-pointer;
-    background: rgba(0, 0, 0, 0.2);
-    box-shadow: 0 0 20px rgba(139, 92, 246, 0.1);
+    @apply relative overflow-hidden rounded-lg border backdrop-blur-sm shadow-lg transition-all hover:shadow-xl cursor-pointer;
+    background: rgba(10, 10, 10, 0.7);
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.15);
   }
 
   .image-card:hover {
-    border-color: rgba(139, 92, 246, 0.4);
-    box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
+    background: rgba(15, 15, 15, 0.8);
+    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow:
+      0 0 40px rgba(168, 85, 247, 0.3),
+      0 0 60px rgba(147, 51, 234, 0.15);
+    transform: translateY(-2px);
   }
 
   .image-card.selected {
-    @apply ring-2 ring-purple-400 ring-offset-2 ring-offset-slate-900;
-    border-color: rgba(139, 92, 246, 0.8);
-    box-shadow: 0 0 40px rgba(139, 92, 246, 0.4);
+    @apply ring-2 ring-offset-2;
+    background: rgba(20, 10, 30, 0.9);
+    border-color: rgba(168, 85, 247, 0.9);
+    ring-color: rgba(168, 85, 247, 0.8);
+    ring-offset-color: #0a0a0a;
+    box-shadow:
+      0 0 50px rgba(168, 85, 247, 0.5),
+      0 0 80px rgba(147, 51, 234, 0.3),
+      inset 0 0 30px rgba(168, 85, 247, 0.1);
   }
 }
