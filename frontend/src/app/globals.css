@@ -47,6 +47,17 @@
     background-attachment: fixed;
   }
 
+  /* Prevent horizontal scroll on mobile - Critical for responsive UX */
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Ensure all containers respect viewport bounds */
+  * {
+    max-width: 100%;
+  }
+
   /* Space-themed gradients */
   .space-gradient {
     background: linear-gradient(135deg,

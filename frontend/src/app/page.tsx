@@ -670,7 +670,7 @@ export default function HomePage() {
 
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-screen-2xl mx-auto px-4 overflow-x-hidden">
       {/* Modern Tabs Navigation */}
       <GlassCard variant="dark" className="purple-glow">
         <div className="space-y-4">
