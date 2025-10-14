@@ -28,68 +28,38 @@ class SelectedImage(BaseModel):
     source: str
 
 class UserImageConfig(BaseModel):
-    """User configuration for image generation and combination"""
+    """Simplified user configuration for image generation - Pareto 80/20 approach"""
 
-    # Character Consistency Settings
-    character_consistency: Literal['strict', 'flexible', 'creative'] = Field(
-        default='flexible',
-        description="Level of character identity preservation"
-    )
-    dani_description: Optional[str] = Field(
-        default=None,
-        description="Custom description for DANI character consistency"
-    )
-    preserve_facial_features: bool = Field(
-        default=True,
-        description="Whether to explicitly preserve facial features"
-    )
-
-    # Visual Style Settings
-    style_preset: Literal['photorealistic', 'artistic', 'cinematic', 'portrait'] = Field(
-        default='photorealistic',
-        description="Overall visual style approach"
-    )
-    lighting_preference: Literal['studio', 'natural', 'dramatic', 'soft'] = Field(
-        default='studio',
-        description="Lighting style preference"
-    )
-    mood: Literal['professional', 'casual', 'dynamic', 'authoritative', 'friendly'] = Field(
-        default='professional',
-        description="Overall mood and tone"
-    )
-
-    # Technical Parameters
+    # TIER 1: Critical Parameters (directly used by Nano Banana API)
     temperature: float = Field(
         default=0.3,
         ge=0.1,
         le=1.0,
-        description="Creativity level (0.1=conservative, 1.0=creative)"
+        description="Creativity level (0.1=precise, 1.0=creative)"
     )
     seed: Optional[int] = Field(
         default=None,
-        description="Seed for reproducible results"
+        description="Seed for reproducible results (optional)"
     )
 
-    # Generation Preferences
-    image_quality: Literal['standard', 'high', 'ultra'] = Field(
-        default='high',
-        description="Output image quality level"
+    # TIER 2: Advanced Parameters (only affect prompt enhancement)
+    style_preset: Optional[Literal['photorealistic', 'artistic', 'cinematic', 'portrait']] = Field(
+        default='photorealistic',
+        description="Overall visual style (prompt enhancement only)"
     )
-    aspect_ratio: Literal['square', 'landscape', 'portrait', 'widescreen'] = Field(
-        default='landscape',
-        description="Preferred aspect ratio for generated images"
+    lighting_preference: Optional[Literal['studio', 'natural', 'dramatic', 'soft']] = Field(
+        default='studio',
+        description="Lighting style (prompt enhancement only)"
+    )
+    mood: Optional[Literal['professional', 'casual', 'dynamic', 'authoritative', 'friendly']] = Field(
+        default='professional',
+        description="Overall mood and tone (prompt enhancement only)"
     )
 
     @validator('temperature')
     def validate_temperature(cls, v):
         if not 0.1 <= v <= 1.0:
             raise ValueError('Temperature must be between 0.1 and 1.0')
-        return v
-
-    @validator('dani_description')
-    def validate_dani_description(cls, v):
-        if v and len(v) > 500:
-            raise ValueError('DANI description must be under 500 characters')
         return v
 
 class ChatRequest(BaseModel):
@@ -183,62 +153,48 @@ TOOLS = [
 SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
 
 class ImageParameterMapper:
-    """Converts user configuration to model-specific parameters"""
-
-    @staticmethod
-    def build_character_consistency_prompt(config: UserImageConfig, base_description: str = None) -> str:
-        """Build character consistency instructions based on user config"""
-        if not config:
-            return base_description or ""
-
-        # Get DANI description (custom or default)
-        dani_desc = config.dani_description or "elegant healthy man, robust build, authoritative gaze, AI leader"
-
-        # Build consistency instructions based on level
-        if config.character_consistency == 'strict':
-            consistency_instruction = f"PRESERVE CHARACTER IDENTITY: Maintain exactly these features: {dani_desc}. Keep facial structure, expression, and physical characteristics identical."
-        elif config.character_consistency == 'flexible':
-            consistency_instruction = f"MAINTAIN CHARACTER CORE: Keep the essence of this character: {dani_desc}. Allow minor variations while preserving key identity features."
-        else:  # creative
-            consistency_instruction = f"CREATIVE INTERPRETATION: Use this character as inspiration: {dani_desc}. Allow artistic interpretation while maintaining recognizable elements."
-
-        return consistency_instruction
+    """Converts simplified user configuration to model-specific parameters"""
 
     @staticmethod
     def build_style_instructions(config: UserImageConfig) -> str:
-        """Build style and mood instructions"""
+        """Build style and mood instructions from simplified config"""
         if not config:
             return "photorealistic style with professional lighting"
 
-        style_map = {
-            'photorealistic': "highly detailed photorealistic style, sharp focus, professional photography",
-            'artistic': "artistic interpretation, stylized rendering, creative visual approach",
-            'cinematic': "cinematic composition, dramatic lighting, movie-like quality",
-            'portrait': "portrait photography style, focused on facial features and expression"
-        }
+        instructions = []
 
-        lighting_map = {
-            'studio': "professional studio lighting, even illumination, soft shadows",
-            'natural': "natural lighting, realistic environmental illumination",
-            'dramatic': "dramatic lighting with strong contrasts, dynamic shadows",
-            'soft': "soft diffused lighting, gentle shadows, warm ambiance"
-        }
+        # Style preset (if provided)
+        if config.style_preset:
+            style_map = {
+                'photorealistic': "highly detailed photorealistic style, sharp focus, professional photography",
+                'artistic': "artistic interpretation, stylized rendering, creative visual approach",
+                'cinematic': "cinematic composition, dramatic lighting, movie-like quality",
+                'portrait': "portrait photography style, focused on facial features and expression"
+            }
+            instructions.append(style_map.get(config.style_preset, style_map['photorealistic']))
 
-        mood_map = {
-            'professional': "professional demeanor, confident and authoritative presence",
-            'casual': "relaxed and approachable, casual atmosphere",
-            'dynamic': "energetic and dynamic, action-oriented composition",
-            'authoritative': "commanding presence, leadership qualities emphasized",
-            'friendly': "warm and approachable, friendly expression"
-        }
+        # Lighting preference (if provided)
+        if config.lighting_preference:
+            lighting_map = {
+                'studio': "professional studio lighting, even illumination, soft shadows",
+                'natural': "natural lighting, realistic environmental illumination",
+                'dramatic': "dramatic lighting with strong contrasts, dynamic shadows",
+                'soft': "soft diffused lighting, gentle shadows, warm ambiance"
+            }
+            instructions.append(lighting_map.get(config.lighting_preference, lighting_map['studio']))
 
-        instructions = [
-            style_map.get(config.style_preset, style_map['photorealistic']),
-            lighting_map.get(config.lighting_preference, lighting_map['studio']),
-            mood_map.get(config.mood, mood_map['professional'])
-        ]
+        # Mood (if provided)
+        if config.mood:
+            mood_map = {
+                'professional': "professional demeanor, confident and authoritative presence",
+                'casual': "relaxed and approachable, casual atmosphere",
+                'dynamic': "energetic and dynamic, action-oriented composition",
+                'authoritative': "commanding presence, leadership qualities emphasized",
+                'friendly': "warm and approachable, friendly expression"
+            }
+            instructions.append(mood_map.get(config.mood, mood_map['professional']))
 
-        return ", ".join(instructions)
+        return ", ".join(instructions) if instructions else "photorealistic style with professional lighting"
 
     @staticmethod
     def build_nano_banana_parameters(config: UserImageConfig) -> Dict[str, Any]:
@@ -259,25 +215,17 @@ class ImageParameterMapper:
 
     @staticmethod
     def build_enhanced_prompt(base_prompt: str, config: UserImageConfig, selected_images: List[SelectedImage] = None) -> str:
-        """Build enhanced prompt combining base prompt with user configuration"""
+        """Build enhanced prompt combining base prompt with simplified user configuration"""
         if not config:
             return base_prompt
 
         # Start with base prompt
         enhanced_parts = [base_prompt]
 
-        # Add character consistency if relevant (check for DANI or if images selected)
-        if "DANI" in base_prompt.upper() or (selected_images and any("dani" in img.source.lower() for img in selected_images)):
-            character_instruction = ImageParameterMapper.build_character_consistency_prompt(config)
-            enhanced_parts.append(character_instruction)
-
-        # Add style instructions
+        # Add style instructions (only if advanced params provided)
         style_instruction = ImageParameterMapper.build_style_instructions(config)
-        enhanced_parts.append(style_instruction)
-
-        # Add facial feature preservation if enabled
-        if config.preserve_facial_features:
-            enhanced_parts.append("Preserve facial features and expressions accurately")
+        if style_instruction and style_instruction != "photorealistic style with professional lighting":
+            enhanced_parts.append(style_instruction)
 
         # Join with proper punctuation
         enhanced_prompt = ". ".join(enhanced_parts)
@@ -882,18 +830,19 @@ async def chat_endpoint(request: ChatRequest):
         # Add user configuration context if provided
         if request.userConfig:
             config_context = f"\n\nUSER IMAGE CONFIGURATION:\n"
-            config_context += f"- Character Consistency: {request.userConfig.character_consistency}\n"
-            config_context += f"- Style Preset: {request.userConfig.style_preset}\n"
-            config_context += f"- Lighting Preference: {request.userConfig.lighting_preference}\n"
-            config_context += f"- Mood: {request.userConfig.mood}\n"
-            config_context += f"- Temperature: {request.userConfig.temperature}\n"
-            config_context += f"- Preserve Facial Features: {request.userConfig.preserve_facial_features}\n"
+            config_context += f"- Creativity (temperature): {request.userConfig.temperature}\n"
 
-            if request.userConfig.dani_description:
-                config_context += f"- Custom DANI Description: {request.userConfig.dani_description}\n"
+            # Advanced parameters (only show if not default)
+            if request.userConfig.style_preset and request.userConfig.style_preset != 'photorealistic':
+                config_context += f"- Style: {request.userConfig.style_preset}\n"
+            if request.userConfig.lighting_preference and request.userConfig.lighting_preference != 'studio':
+                config_context += f"- Lighting: {request.userConfig.lighting_preference}\n"
+            if request.userConfig.mood and request.userConfig.mood != 'professional':
+                config_context += f"- Mood: {request.userConfig.mood}\n"
+            if request.userConfig.seed:
+                config_context += f"- Seed (reproducibility): {request.userConfig.seed}\n"
 
-            config_context += "\nIMPORTANT: Use these preferences when calling image generation tools. "
-            config_context += "Apply the specified character consistency level, style, and mood to enhance prompts appropriately."
+            config_context += "\nIMPORTANT: Use these preferences when calling image generation tools."
             system_content += config_context
 
         if request.selectedImages:
