@@ -13,12 +13,10 @@ def test_image_generation():
         "messages": [],
         "selectedImages": [],
         "userConfig": {
-            "character_consistency": "flexible",
+            "temperature": 0.3,
             "style_preset": "photorealistic",
             "lighting_preference": "studio",
-            "mood": "professional",
-            "temperature": 0.3,
-            "preserve_facial_features": True
+            "mood": "professional"
         }
     }
 

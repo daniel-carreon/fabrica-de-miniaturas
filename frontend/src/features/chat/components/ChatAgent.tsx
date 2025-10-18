@@ -75,9 +75,10 @@ export default function ChatAgent() {
 
       console.log('🎨 Using config:', {
         preset: activePreset || 'custom',
-        consistency: config.character_consistency,
         style: config.style_preset,
-        temperature: config.temperature
+        temperature: config.temperature,
+        lighting: config.lighting_preference,
+        mood: config.mood
       })
 
       if (!response.ok) {

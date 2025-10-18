@@ -147,8 +147,26 @@ const useImageConfigStore = create<ImageConfigState>()(
 
         // For any version mismatch, return a clean state structure
         if (typeof persistedState === 'object' && persistedState !== null) {
+          // Clean config by only keeping valid fields
+          const cleanConfig = {
+            temperature: persistedState.config?.temperature || DEFAULT_CONFIG.temperature,
+            seed: persistedState.config?.seed,
+            style_preset: persistedState.config?.style_preset || DEFAULT_CONFIG.style_preset,
+            lighting_preference: persistedState.config?.lighting_preference || DEFAULT_CONFIG.lighting_preference,
+            mood: persistedState.config?.mood || DEFAULT_CONFIG.mood
+          }
+
+          // Remove undefined values
+          Object.keys(cleanConfig).forEach(key => {
+            if (cleanConfig[key as keyof UserImageConfig] === undefined) {
+              delete cleanConfig[key as keyof UserImageConfig]
+            }
+          })
+
+          console.log('✅ Migrated config - removed obsolete fields (character_consistency, preserve_facial_features)')
+
           return {
-            config: persistedState.config || DEFAULT_CONFIG,
+            config: cleanConfig,
             activePreset: persistedState.activePreset || null,
             customPresets: persistedState.customPresets || {},
             isPanelExpanded: persistedState.isPanelExpanded || false
@@ -156,6 +174,7 @@ const useImageConfigStore = create<ImageConfigState>()(
         }
 
         // If persisted state is invalid, return defaults
+        console.log('⚠️ Invalid persisted state, using defaults')
         return {
           config: DEFAULT_CONFIG,
           activePreset: null,
@@ -164,8 +183,8 @@ const useImageConfigStore = create<ImageConfigState>()(
         }
       },
 
-      // Current version for migration tracking
-      version: 1,
+      // Current version for migration tracking (bumped to 2 to force migration)
+      version: 2,
 
       // Merge persisted state back
       onRehydrateStorage: () => (state, error) => {
