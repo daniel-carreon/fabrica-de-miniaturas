@@ -30,6 +30,9 @@ class SelectedImage(BaseModel):
 class UserImageConfig(BaseModel):
     """Simplified user configuration for image generation - Pareto 80/20 approach"""
 
+    class Config:
+        extra = "ignore"  # Ignore obsolete fields from old localStorage (character_consistency, etc.)
+
     # TIER 1: Critical Parameters (directly used by Nano Banana API)
     temperature: float = Field(
         default=0.3,
@@ -342,7 +345,7 @@ async def call_generate_api(prompt: str, num_images: int = 3, user_config: UserI
             user_config,
             selected_images
         )
-        logger.info(f"🎨 Using user config: {user_config.style_preset}, consistency: {user_config.character_consistency}")
+        logger.info(f"🎨 Using user config: style={user_config.style_preset}, temp={user_config.temperature}")
     else:
         # Fallback to original logic for backwards compatibility
         dani_description = "elegant healthy man, robust build, authoritative gaze, AI leader, 8K"
