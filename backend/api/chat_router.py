@@ -219,10 +219,17 @@ class ImageParameterMapper:
     @staticmethod
     def build_enhanced_prompt(base_prompt: str, config: UserImageConfig, selected_images: List[SelectedImage] = None) -> str:
         """Build enhanced prompt combining base prompt with simplified user configuration"""
+        # CRITICAL: Always add DANI description when detected (restore pre-Pareto logic)
+        DANI_DESCRIPTION = "elegant healthy man, robust build, authoritative gaze, AI leader, 8K"
+
+        # Check if DANI is mentioned and add character description
+        if "DANI" in base_prompt.upper():
+            base_prompt = f"{base_prompt} ({DANI_DESCRIPTION})"
+
         if not config:
             return base_prompt
 
-        # Start with base prompt
+        # Start with base prompt (now with DANI description if applicable)
         enhanced_parts = [base_prompt]
 
         # Add style instructions (only if advanced params provided)
