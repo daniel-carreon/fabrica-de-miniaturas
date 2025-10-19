@@ -2,13 +2,19 @@
 import replicate
 import os
 import sys
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Parámetros de Predicción ---
 API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
-MODEL_VERSION = "daniel-carreon/daniel-flux-lora:0df303cdaee452247e1c57034d5e558615046eabddaa433b21fdd9ad751d3c78"
+# Use environment variables instead of hardcoded model (防止使用旧模型)
+MODEL_NAME = os.getenv("NEXT_PUBLIC_MODEL_NAME", "daniel-carreon/danielcarreong")
+MODEL_VERSION = os.getenv("NEXT_PUBLIC_MODEL_VERSION", "56c9356f9c4f271e294b8533b398f318881f02e1568e4733fc6cacfad1a759bc")
+MODEL_FULL = f"{MODEL_NAME}:{MODEL_VERSION}"
 
 # Prompt diseñado para una miniatura de YouTube de alta calidad
-PROMPT = "Close-up photo of DANIELC with a surprised and excited expression, perfect for a YouTube thumbnail. Dramatic, vibrant studio lighting. Ultra sharp, 8k resolution, incredibly high detail, professional photography."
+PROMPT = "Close-up photo of DANI with a surprised and excited expression, perfect for a YouTube thumbnail. Dramatic, vibrant studio lighting. Ultra sharp, 8k resolution, incredibly high detail, professional photography."
 
 def main():
     """
@@ -23,7 +29,7 @@ def main():
 
     try:
         output = replicate.run(
-            MODEL_VERSION,
+            MODEL_FULL,
             input={"prompt": PROMPT}
         )
 

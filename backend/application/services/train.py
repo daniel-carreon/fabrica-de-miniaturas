@@ -5,9 +5,10 @@ import sys
 # --- Parámetros de Entrenamiento ---
 API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
 DESTINATION_MODEL_OWNER = "daniel-carreon"
-DESTINATION_MODEL_NAME = "daniel-flux-lora"
+# NOTE: This is for TRAINING new models only. Production uses "danielcarreong" model
+DESTINATION_MODEL_NAME = "daniel-flux-lora"  # Name for newly trained model
 INPUT_IMAGES_PATH = "datos_entrenamiento.zip"
-TRIGGER_WORD = "DANIELC"
+TRIGGER_WORD = "DANI"  # Changed from DANIELC to match current LoRA trigger
 LORA_TYPE = "subject"
 TRAINER_VERSION = "replicate/fast-flux-trainer:8b10794665aed907bb98a1a5324cd1d3a8bea0e9b31e65210967fb9c9e2e08ed"
 
