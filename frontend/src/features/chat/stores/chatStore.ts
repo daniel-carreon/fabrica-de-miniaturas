@@ -8,6 +8,8 @@ export interface ChatMessage {
   reasoning_details?: any[]
   tool_used?: string
   model?: string
+  final_prompt?: string
+  prompt_length?: number
 }
 
 interface ChatStore {

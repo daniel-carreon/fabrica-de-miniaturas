@@ -47,31 +47,31 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
 
   return (
     <div className={`w-full ${className}`}>
-      <GlassCard className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="space-y-4">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 pb-3 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <Settings className="w-5 h-5 text-purple-400" />
-            <h3 className="text-lg font-semibold text-white">Configuración</h3>
+        <div className="flex items-center justify-between pb-3 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <Settings className="w-4 h-4 text-purple-400" />
+            <h3 className="text-base font-semibold text-white">Configuración</h3>
           </div>
-          <span className="text-sm text-purple-300 bg-purple-500/20 px-3 py-1 rounded-md self-start sm:self-center">
+          <span className="text-xs text-purple-300 bg-purple-500/20 px-2 py-1 rounded-md">
             {activePreset === 'youtube_thumbnail' ? '📺 YouTube' :
              activePreset === 'professional_portrait' ? '👔 Profesional' :
-             activePreset === 'creative_art' ? '🎨 Arte Creativo' :
-             activePreset === 'social_media' ? '📱 Redes Sociales' :
-             '⚙️ Personalizado'}
+             activePreset === 'creative_art' ? '🎨 Arte' :
+             activePreset === 'social_media' ? '📱 Social' :
+             '⚙️ Custom'}
           </span>
         </div>
 
         {/* MODO SIMPLE - Siempre visible */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Presets Rápidos */}
           <div>
-            <h4 className="text-sm font-medium text-purple-300 mb-3">🎨 Estilos Rápidos</h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <h4 className="text-xs font-medium text-purple-300 mb-2">🎨 Estilos Rápidos</h4>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => applyPreset('youtube_thumbnail')}
-                className={`p-3 rounded-lg text-sm transition-all ${
+                className={`p-2.5 rounded-lg text-xs transition-all ${
                   activePreset === 'youtube_thumbnail'
                     ? 'bg-purple-600 text-white ring-2 ring-purple-400'
                     : 'bg-white/10 text-purple-200 hover:bg-white/20'
@@ -81,7 +81,7 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
               </button>
               <button
                 onClick={() => applyPreset('professional_portrait')}
-                className={`p-3 rounded-lg text-sm transition-all ${
+                className={`p-2.5 rounded-lg text-xs transition-all ${
                   activePreset === 'professional_portrait'
                     ? 'bg-purple-600 text-white ring-2 ring-purple-400'
                     : 'bg-white/10 text-purple-200 hover:bg-white/20'
@@ -91,7 +91,7 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
               </button>
               <button
                 onClick={() => applyPreset('creative_art')}
-                className={`p-3 rounded-lg text-sm transition-all ${
+                className={`p-2.5 rounded-lg text-xs transition-all ${
                   activePreset === 'creative_art'
                     ? 'bg-purple-600 text-white ring-2 ring-purple-400'
                     : 'bg-white/10 text-purple-200 hover:bg-white/20'
@@ -101,7 +101,7 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
               </button>
               <button
                 onClick={resetToDefaults}
-                className="p-3 rounded-lg text-sm bg-gray-600/20 text-gray-300 hover:bg-gray-600/40 transition-all"
+                className="p-2.5 rounded-lg text-xs bg-gray-600/20 text-gray-300 hover:bg-gray-600/40 transition-all"
               >
                 ↺ Reiniciar
               </button>
@@ -110,8 +110,8 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
 
           {/* Creativity Slider - Principal Control */}
           <div>
-            <label className="block text-sm font-medium text-purple-300 mb-2 flex items-center gap-2">
-              <Zap className="w-4 h-4" />
+            <label className="block text-xs font-medium text-purple-300 mb-1.5 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5" />
               Creatividad: {creativityPercentage}%
             </label>
             <input
@@ -121,11 +121,11 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
               step="0.1"
               value={config.temperature}
               onChange={(e) => updateConfig({ temperature: parseFloat(e.target.value) })}
-              className="w-full h-3 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
+              className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
             />
-            <div className="flex justify-between text-xs text-purple-300 mt-1">
+            <div className="flex justify-between text-[10px] text-purple-300 mt-1">
               <span>🎯 Preciso</span>
-              <span className="text-purple-200 font-medium">←  Ideal para miniaturas  →</span>
+              <span className="text-purple-200 font-medium">← Miniaturas →</span>
               <span>🎨 Creativo</span>
             </div>
           </div>
@@ -134,32 +134,32 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
         {/* Toggle Advanced Mode */}
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 rounded-lg transition-all border border-white/10"
+          className="w-full flex items-center justify-between p-2.5 bg-white/5 hover:bg-white/10 rounded-lg transition-all border border-white/10"
         >
-          <span className="text-sm font-medium text-purple-200">
+          <span className="text-xs font-medium text-purple-200">
             ⚙️ Modo Avanzado
           </span>
           {showAdvanced ? (
-            <ChevronUp className="w-4 h-4 text-purple-300" />
+            <ChevronUp className="w-3.5 h-3.5 text-purple-300" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-purple-300" />
+            <ChevronDown className="w-3.5 h-3.5 text-purple-300" />
           )}
         </button>
 
         {/* MODO AVANZADO - Colapsable */}
         {showAdvanced && (
-          <div className="space-y-4 pt-2 border-t border-white/10 animate-in slide-in-from-top-2 duration-200">
-            <p className="text-xs text-purple-300/70">
+          <div className="space-y-3 pt-2 border-t border-white/10 animate-in slide-in-from-top-2 duration-200">
+            <p className="text-[10px] text-purple-300/70 bg-purple-500/5 p-2 rounded">
               ⚠️ Estos parámetros solo afectan el prompt, no el modelo directamente
             </p>
 
             {/* Style Preset */}
             <div>
-              <label className="block text-sm text-purple-200 mb-2">Tipo de Imagen</label>
+              <label className="block text-xs text-purple-200 mb-1.5">Tipo de Imagen</label>
               <select
                 value={config.style_preset || 'photorealistic'}
                 onChange={(e) => updateConfig({ style_preset: e.target.value as any })}
-                className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none text-sm"
+                className="w-full p-2 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none text-xs"
               >
                 <option value="photorealistic">📸 Foto Realista</option>
                 <option value="artistic">🎨 Artístico</option>
@@ -170,11 +170,11 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
 
             {/* Lighting */}
             <div>
-              <label className="block text-sm text-purple-200 mb-2">Iluminación</label>
+              <label className="block text-xs text-purple-200 mb-1.5">Iluminación</label>
               <select
                 value={config.lighting_preference || 'studio'}
                 onChange={(e) => updateConfig({ lighting_preference: e.target.value as any })}
-                className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none text-sm"
+                className="w-full p-2 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none text-xs"
               >
                 <option value="studio">💡 Estudio</option>
                 <option value="natural">☀️ Natural</option>
@@ -185,11 +185,11 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
 
             {/* Mood */}
             <div>
-              <label className="block text-sm text-purple-200 mb-2">Ambiente</label>
+              <label className="block text-xs text-purple-200 mb-1.5">Ambiente</label>
               <select
                 value={config.mood || 'professional'}
                 onChange={(e) => updateConfig({ mood: e.target.value as any })}
-                className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none text-sm"
+                className="w-full p-2 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none text-xs"
               >
                 <option value="professional">💼 Profesional</option>
                 <option value="casual">😊 Casual</option>
@@ -201,7 +201,7 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
 
             {/* Seed (Optional) */}
             <div>
-              <label className="block text-sm text-purple-200 mb-2">
+              <label className="block text-xs text-purple-200 mb-1.5">
                 Código Fijo (Opcional)
               </label>
               <input
@@ -209,18 +209,18 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
                 value={config.seed || ''}
                 onChange={(e) => updateConfig({ seed: e.target.value ? parseInt(e.target.value) : undefined })}
                 placeholder="Aleatorio si está vacío"
-                className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none text-sm"
+                className="w-full p-2 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none text-xs"
               />
-              <p className="text-xs text-purple-300 mt-1">
-                Para obtener resultados reproducibles (mismo código = misma imagen)
+              <p className="text-[10px] text-purple-300 mt-1">
+                Para resultados reproducibles (mismo código = misma imagen)
               </p>
             </div>
           </div>
         )}
 
         {/* Summary */}
-        <div className="pt-4 border-t border-white/10">
-          <p className="text-xs text-purple-300 leading-relaxed bg-purple-500/5 p-3 rounded-lg">
+        <div className="pt-3 border-t border-white/10">
+          <p className="text-[10px] text-purple-300 leading-relaxed bg-purple-500/5 p-2.5 rounded-lg">
             <span className="font-medium">💡 Tip:</span> {' '}
             {config.temperature < 0.4
               ? 'Creatividad baja - Ideal para miniaturas consistentes y profesionales'
@@ -229,7 +229,7 @@ export default function ImageConfigPanel({ config, onConfigChange, className = '
               : 'Creatividad media - Balance entre consistencia y variedad'}
           </p>
         </div>
-      </GlassCard>
+      </div>
     </div>
   )
 }

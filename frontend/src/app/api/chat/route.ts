@@ -20,6 +20,17 @@ interface OpenRouterMessage {
   content: string
 }
 
+interface PipelineEvent {
+  id: string
+  stage: string
+  status: 'pending' | 'active' | 'complete' | 'error'
+  message: string
+  icon: string
+  progress?: number
+  details?: string[]
+  timestamp: number
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('🔍 Receiving chat request...')
@@ -83,8 +94,21 @@ You are part of "Daniel Flux Context" - a professional image generation system f
     ]
 
     console.log('📤 Sending to OpenRouter:', {
-      model: 'gpt-5-mini',
+      model: 'anthropic/claude-haiku-4.5',
       messagesCount: openRouterMessages.length
+    })
+
+    // Initialize pipeline events
+    const pipelineEvents: PipelineEvent[] = []
+
+    // Stage 1: AI Thinking
+    pipelineEvents.push({
+      id: 'ai-thinking',
+      stage: 'AI Thinking',
+      status: 'active',
+      message: 'Claude Haiku 4.5 analyzing your request...',
+      icon: '🧠',
+      timestamp: Date.now()
     })
 
     // Call OpenRouter API
@@ -97,7 +121,7 @@ You are part of "Daniel Flux Context" - a professional image generation system f
         'X-Title': 'Daniel Flux Context'
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
+        model: 'anthropic/claude-haiku-4.5',
         messages: openRouterMessages,
         max_tokens: 1500, // Increased for tool arguments
         temperature: 0.7,
@@ -170,6 +194,9 @@ You are part of "Daniel Flux Context" - a professional image generation system f
     const data = await openRouterResponse.json()
     console.log('✅ OpenRouter response received')
 
+    // Mark AI thinking as complete
+    pipelineEvents[0].status = 'complete'
+
     const choice = data.choices?.[0]
     const responseMessage = choice?.message
 
@@ -181,7 +208,30 @@ You are part of "Daniel Flux Context" - a professional image generation system f
       const functionName = toolCall.function.name
       const functionArgs = JSON.parse(toolCall.function.arguments)
 
+      // Stage 2: Tool Selected
+      pipelineEvents.push({
+        id: 'tool-selected',
+        stage: 'Tool Selected',
+        status: 'complete',
+        message: `Detected: ${functionName === 'generate_images' ? 'Image Generation' : 'Image Combination'}`,
+        icon: functionName === 'generate_images' ? '🎨' : '🔄',
+        details: functionName === 'generate_images'
+          ? [`Prompt: "${functionArgs.prompt}"`, `Count: ${functionArgs.count || 4} images`]
+          : [`Combining ${functionArgs.image_urls?.length || 0} images`],
+        timestamp: Date.now()
+      })
+
       if (functionName === 'generate_images') {
+        // Stage 3: Generating
+        pipelineEvents.push({
+          id: 'generating',
+          stage: 'Generating Images',
+          status: 'active',
+          message: 'Replicate is creating your images...',
+          icon: '🎬',
+          progress: 0,
+          timestamp: Date.now()
+        })
         // Redirect to generate API
         const generateResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/generate`, {
           method: 'POST',
@@ -195,25 +245,62 @@ You are part of "Daniel Flux Context" - a professional image generation system f
         const generateResult = await generateResponse.json()
 
         if (generateResult.success) {
+          // Mark generating as complete
+          const generatingStage = pipelineEvents.find(e => e.id === 'generating')
+          if (generatingStage) {
+            generatingStage.status = 'complete'
+            generatingStage.progress = 100
+          }
+
+          // Add completion stage
+          pipelineEvents.push({
+            id: 'complete',
+            stage: 'Complete',
+            status: 'complete',
+            message: `Successfully generated ${generateResult.data.images.length} images!`,
+            icon: '✓',
+            timestamp: Date.now()
+          })
+
           return NextResponse.json({
             response: `✅ Generated ${generateResult.data.images.length} images with prompt: "${functionArgs.prompt}"\n\nImages are being automatically optimized to WebP format and will appear in your gallery shortly.`,
             tool_used: 'generate_images',
             tool_result: generateResult.data,
             usage: data.usage,
-            model: data.model
+            model: data.model,
+            pipeline: pipelineEvents
           })
         } else {
+          // Mark as error
+          const generatingStage = pipelineEvents.find(e => e.id === 'generating')
+          if (generatingStage) {
+            generatingStage.status = 'error'
+            generatingStage.message = 'Failed to generate images'
+          }
+
           return NextResponse.json({
             response: `❌ Failed to generate images: ${generateResult.error}`,
             tool_used: 'generate_images',
             tool_error: generateResult.error,
             usage: data.usage,
-            model: data.model
+            model: data.model,
+            pipeline: pipelineEvents
           })
         }
       }
 
       if (functionName === 'combine_images') {
+        // Stage 3: Combining
+        pipelineEvents.push({
+          id: 'combining',
+          stage: 'Combining Images',
+          status: 'active',
+          message: 'Gemini 2.5 Flash is combining your images...',
+          icon: '🎬',
+          progress: 0,
+          timestamp: Date.now()
+        })
+
         // Use Nano Banana via OpenRouter for combination
         const combineResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -260,6 +347,23 @@ You are part of "Daniel Flux Context" - a professional image generation system f
             const saveResult = await saveResponse.json()
 
             if (saveResult.success) {
+              // Mark combining as complete
+              const combiningStage = pipelineEvents.find(e => e.id === 'combining')
+              if (combiningStage) {
+                combiningStage.status = 'complete'
+                combiningStage.progress = 100
+              }
+
+              // Add completion stage
+              pipelineEvents.push({
+                id: 'complete',
+                stage: 'Complete',
+                status: 'complete',
+                message: `Successfully combined ${selectedImages.length} images!`,
+                icon: '✓',
+                timestamp: Date.now()
+              })
+
               return NextResponse.json({
                 response: `✅ Successfully combined ${selectedImages.length} images!\n\nPrompt: "${functionArgs.combination_prompt}"\n\nThe combined image is being optimized to WebP format and will appear in your gallery shortly.`,
                 tool_used: 'combine_images',
@@ -269,10 +373,18 @@ You are part of "Daniel Flux Context" - a professional image generation system f
                   save_result: saveResult.data
                 },
                 usage: data.usage,
-                model: data.model
+                model: data.model,
+                pipeline: pipelineEvents
               })
             }
           }
+        }
+
+        // Mark combining as error
+        const combiningStage = pipelineEvents.find(e => e.id === 'combining')
+        if (combiningStage) {
+          combiningStage.status = 'error'
+          combiningStage.message = 'Failed to combine images'
         }
 
         return NextResponse.json({
@@ -280,7 +392,8 @@ You are part of "Daniel Flux Context" - a professional image generation system f
           tool_used: 'combine_images',
           tool_error: 'Combination failed',
           usage: data.usage,
-          model: data.model
+          model: data.model,
+          pipeline: pipelineEvents
         })
       }
     }

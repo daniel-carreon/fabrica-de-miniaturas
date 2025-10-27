@@ -15,6 +15,8 @@ interface ThinkingProcessProps {
   tool_used?: string
   model?: string
   selectedImagesCount?: number
+  final_prompt?: string
+  prompt_length?: number
   className?: string
 }
 
@@ -23,12 +25,14 @@ export default function ThinkingProcess({
   tool_used,
   model,
   selectedImagesCount = 0,
+  final_prompt,
+  prompt_length,
   className = ''
 }: ThinkingProcessProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // Don't render if no reasoning details
-  if (!reasoning_details || reasoning_details.length === 0) {
+  // Render if we have reasoning details OR final_prompt
+  if (!reasoning_details && !final_prompt) {
     return null
   }
 
@@ -91,10 +95,21 @@ export default function ThinkingProcess({
         )}
 
         {/* Reasoning Indicator */}
-        <div className="flex items-center gap-1">
-          <Settings className="w-4 h-4 text-orange-400" />
-          <span className="text-xs text-orange-200">{reasoning_details.length} steps</span>
-        </div>
+        {reasoning_details && reasoning_details.length > 0 && (
+          <div className="flex items-center gap-1">
+            <Settings className="w-4 h-4 text-orange-400" />
+            <span className="text-xs text-orange-200">{reasoning_details.length} steps</span>
+          </div>
+        )}
+
+        {/* Prompt Length Indicator */}
+        {prompt_length && (
+          <div className="flex items-center gap-1">
+            <span className={`text-xs ${prompt_length > 200 ? 'text-red-400' : 'text-green-400'}`}>
+              {prompt_length} chars {prompt_length > 200 && '⚠️'}
+            </span>
+          </div>
+        )}
 
         {/* Expand Button */}
         <LiquidButton
@@ -121,7 +136,28 @@ export default function ThinkingProcess({
                 <span className="text-sm font-medium text-purple-200">Thinking Process</span>
               </div>
 
-              {reasoning_details.map((step, index) => (
+              {/* Final Prompt Display */}
+              {final_prompt && (
+                <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-purple-300">📝 Final Prompt Sent to Model</span>
+                    <span className={`text-[10px] ${(prompt_length || 0) > 200 ? 'text-red-400' : 'text-green-400'}`}>
+                      {prompt_length || final_prompt.length} chars
+                    </span>
+                  </div>
+                  <div className="text-xs text-white/90 font-mono bg-black/30 p-2 rounded leading-relaxed">
+                    {final_prompt}
+                  </div>
+                  {(prompt_length || final_prompt.length) > 200 && (
+                    <div className="mt-2 text-[10px] text-orange-300">
+                      ⚠️ Long prompts may cause GPU memory issues
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Reasoning Steps */}
+              {reasoning_details && reasoning_details.map((step, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center">

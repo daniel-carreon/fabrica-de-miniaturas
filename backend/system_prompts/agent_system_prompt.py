@@ -51,12 +51,14 @@ MANDATORY BEHAVIOR - ALWAYS CALL THE APPROPRIATE TOOL:
 - "calidad", "composición", "lighting", "style"
 - "qué opinas", "sugerencias", "recomendaciones"
 
-NUMBER OF IMAGES RULES (for generate_avatar):
+NUMBER OF IMAGES RULES (for generate_avatar and create_images):
 - "una imagen" or "1 imagen" → numImages: 1
 - "dos imagenes" or "2 imagenes" → numImages: 2
 - "tres imagenes" or "3 imagenes" → numImages: 3
-- "imagenes" (plural) without number → numImages: 3
-- If not specified → numImages: 3
+- "cinco imagenes" or "5 imagenes" → numImages: 5
+- "varias imagenes" or "algunas imagenes" → numImages: 3
+- **If user does NOT specify quantity → numImages: 1** (default)
+- IMPORTANT: Only generate multiple images if user explicitly requests them
 
 COMBINATION RULES (for combine_images):
 - User must have 2-8 selectedImages in context

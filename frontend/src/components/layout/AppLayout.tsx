@@ -154,11 +154,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         {/* Image Configuration Overlay */}
         {isConfigOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-start justify-center pt-20">
-            <div className="w-full max-w-md bg-black/90 backdrop-blur-md border border-purple-500/30 rounded-xl mx-4">
-              <div className="p-6 relative">
-                {/* Close button */}
-                <div className="absolute top-4 right-4 z-10">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-black/90 backdrop-blur-md border border-purple-500/30 rounded-xl shadow-2xl max-h-[90vh] flex flex-col">
+              {/* Fixed Header */}
+              <div className="p-4 sm:p-6 border-b border-purple-500/20 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white purple-glow">
+                    🎨 Image Configuration
+                  </h3>
                   <LiquidButton
                     onClick={() => setIsConfigOpen(false)}
                     variant="space"
@@ -168,11 +171,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     ✕
                   </LiquidButton>
                 </div>
+              </div>
 
-                <h3 className="text-lg font-bold text-white mb-4 purple-glow">
-                  🎨 Image Configuration
-                </h3>
-
+              {/* Scrollable Content */}
+              <div className="overflow-y-auto flex-1 p-4 sm:p-6 custom-scrollbar">
                 <ImageConfigPanel
                   config={config}
                   onConfigChange={updateConfig}

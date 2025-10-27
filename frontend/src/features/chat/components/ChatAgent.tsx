@@ -11,16 +11,26 @@ import { LiquidButton } from '@/components/ui/liquid-glass-button'
 import PromptsPanel from '@/components/ui/PromptsPanel'
 import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
 import ThinkingProcess from '@/components/ui/ThinkingProcess'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import AgentPipeline, { PipelineStage } from '@/components/ui/AgentPipeline'
+import { ChevronDown, ChevronUp, Copy, Check, Paperclip } from 'lucide-react'
 
 interface ReasoningStep {
   type: 'summary' | 'raw_text' | 'encrypted'
   content: string
 }
 
+interface PastedImage {
+  id: string
+  base64: string
+  preview: string
+}
+
 export default function ChatAgent() {
   const [input, setInput] = useState('')
   const [showPrompts, setShowPrompts] = useState(false)
+  const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>([])
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+  const [pastedImages, setPastedImages] = useState<PastedImage[]>([])
   const {
     messages,
     isLoading,
@@ -37,6 +47,52 @@ export default function ChatAgent() {
   useEffect(() => {
     loadImagesFromDatabase()
   }, [])
+
+  const handleCopy = async (text: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedMessageId(messageId)
+      setTimeout(() => setCopiedMessageId(null), 2000) // Reset after 2 seconds
+    } catch (error) {
+      console.error('Failed to copy:', error)
+    }
+  }
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+
+      // Check if it's an image
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault() // Prevent default paste behavior
+
+        const blob = item.getAsFile()
+        if (!blob) continue
+
+        // Convert to base64
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          const base64String = reader.result as string
+          const pastedImage: PastedImage = {
+            id: `pasted_${Date.now()}_${i}`,
+            base64: base64String,
+            preview: base64String // Use same for preview
+          }
+
+          setPastedImages(prev => [...prev, pastedImage])
+          console.log('📸 Image pasted:', pastedImage.id)
+        }
+        reader.readAsDataURL(blob)
+      }
+    }
+  }
+
+  const removePastedImage = (id: string) => {
+    setPastedImages(prev => prev.filter(img => img.id !== id))
+  }
 
   const handleInjectPrompt = (prompt: string) => {
     setInput(prev => {
@@ -69,7 +125,8 @@ export default function ChatAgent() {
           message: userMessage.content,
           messages: messages, // Context history
           selectedImages: selectedImages, // Include selected images for combination tool
-          userConfig: config // Include user configuration for enhanced prompts
+          userConfig: config, // Include user configuration for enhanced prompts
+          pastedImages: pastedImages.map(img => img.base64) // Include pasted images for vision
         }),
       })
 
@@ -88,6 +145,11 @@ export default function ChatAgent() {
 
       const data = await response.json()
       console.log('✅ OpenRouter response:', data)
+
+      // Update pipeline if available
+      if (data.pipeline && Array.isArray(data.pipeline)) {
+        setPipelineStages(data.pipeline)
+      }
 
       // If tool was used and returned images, add them to gallery
       if ((data.tool_used === 'generate_avatar' || data.tool_used === 'create_images' || data.tool_used === 'combine_images') && data.tool_result?.images) {
@@ -195,7 +257,9 @@ export default function ChatAgent() {
         timestamp: new Date(),
         reasoning_details: data.reasoning_details,
         tool_used: data.tool_used,
-        model: data.model
+        model: data.model,
+        final_prompt: data.final_prompt,
+        prompt_length: data.prompt_length
       }
 
       addMessage(assistantMessage)
@@ -211,6 +275,11 @@ export default function ChatAgent() {
       addMessage(errorMessage)
     } finally {
       setLoading(false)
+      setPastedImages([]) // Clear pasted images after sending
+      // Limpia el pipeline después de 3 segundos
+      setTimeout(() => {
+        setPipelineStages([])
+      }, 3000)
     }
   }
 
@@ -268,17 +337,30 @@ export default function ChatAgent() {
                     message.role === 'user'
                       ? 'bg-purple-600/80 text-white rounded-l-lg rounded-tr-lg'
                       : 'bg-black/60 text-purple-100 rounded-r-lg rounded-tl-lg border border-purple-500/30'
-                  } backdrop-blur-sm p-3 shadow-lg`}
+                  } backdrop-blur-sm p-3 shadow-lg relative group`}
                 >
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  <span className="text-xs opacity-60 mt-1 block">
-                    {message.timestamp.toLocaleTimeString()}
-                  </span>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs opacity-60">
+                      {message.timestamp.toLocaleTimeString()}
+                    </span>
+                    <button
+                      onClick={() => handleCopy(message.content, message.id)}
+                      className="text-purple-300 hover:text-purple-100 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Copy message"
+                    >
+                      {copiedMessageId === message.id ? (
+                        <Check size={14} />
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Thinking Process for AI messages */}
-              {message.role === 'assistant' && (message.reasoning_details || message.tool_used) && (
+              {message.role === 'assistant' && (message.reasoning_details || message.tool_used || message.final_prompt) && (
                 <div className="flex justify-start">
                   <div className="max-w-[80%]">
                     <ThinkingProcess
@@ -286,6 +368,8 @@ export default function ChatAgent() {
                       tool_used={message.tool_used}
                       model={message.model}
                       selectedImagesCount={selectedImages.length}
+                      final_prompt={message.final_prompt}
+                      prompt_length={message.prompt_length}
                     />
                   </div>
                 </div>
@@ -294,17 +378,11 @@ export default function ChatAgent() {
           ))
         )}
 
-        {/* Loading indicator */}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-black/60 text-purple-100 rounded-r-lg rounded-tl-lg border border-purple-500/30 backdrop-blur-sm p-3 shadow-lg">
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
-                <span className="text-sm">Thinking...</span>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Agent Pipeline - Shows real-time processing stages */}
+        <AgentPipeline
+          stages={pipelineStages}
+          isVisible={isLoading || pipelineStages.length > 0}
+        />
       </div>
 
 
@@ -344,11 +422,38 @@ export default function ChatAgent() {
               </div>
             </div>
           )}
+
+          {/* Pasted Images Preview */}
+          {pastedImages.length > 0 && (
+            <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg p-2 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <Paperclip size={14} className="text-blue-300" />
+                <span className="text-blue-200 text-xs">{pastedImages.length} pasted</span>
+                <div className="flex gap-1 flex-1">
+                  {pastedImages.map((img) => (
+                    <div key={img.id} className="relative group">
+                      <div className="w-12 h-12 rounded border border-blue-400/50 overflow-hidden">
+                        <img src={img.preview} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <button
+                        onClick={() => removePastedImage(img.id)}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask me to generate images, combine them, or anything else..."
+            onPaste={handlePaste}
+            placeholder="Ask me to generate images, combine them, or paste screenshots (Ctrl+V)..."
             className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg backdrop-blur-sm text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition-all resize-none"
             rows={3}
             disabled={isLoading}

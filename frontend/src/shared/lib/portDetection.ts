@@ -3,7 +3,7 @@
  * Automatically finds available backend port
  */
 
-const BACKEND_PORTS = [8000, 8001, 8002, 8003, 8004]
+const BACKEND_PORTS = [8002, 8000, 8001, 8003, 8004]
 
 interface PortTestResult {
   port: number

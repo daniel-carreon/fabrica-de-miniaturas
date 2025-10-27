@@ -69,10 +69,20 @@ class ChatRequest(BaseModel):
     message: str
     messages: List[ChatMessage] = []
     selectedImages: List[SelectedImage] = []
+    pastedImages: List[str] = []  # Base64 encoded images from clipboard
     userConfig: Optional[UserImageConfig] = Field(
         default=None,
         description="User configuration for image generation parameters"
     )
+
+class PipelineStage(BaseModel):
+    id: str
+    name: str
+    icon: str
+    status: str  # 'pending' | 'active' | 'complete' | 'error'
+    message: str
+    progress: Optional[int] = None
+    details: Optional[List[str]] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -81,6 +91,9 @@ class ChatResponse(BaseModel):
     usage: Optional[Dict[str, Any]] = None
     model: Optional[str] = None
     reasoning_details: Optional[List[Dict[str, Any]]] = None
+    final_prompt: Optional[str] = None  # Show user what was actually sent to model
+    prompt_length: Optional[int] = None
+    pipeline: Optional[List[PipelineStage]] = None  # Real-time processing stages
 
 # OpenRouter config from environment variables
 import os
@@ -106,7 +119,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "prompt": {"type": "string", "description": "Image description"},
-                "numImages": {"type": "integer", "minimum": 1, "maximum": 10, "default": 3}
+                "numImages": {"type": "integer", "minimum": 1, "maximum": 10, "description": "Number of images to generate. AI should decide based on user request. If not specified by user, default to 1."}
             },
             "required": ["prompt"]
         }
@@ -122,7 +135,7 @@ TOOLS = [
             "properties": {
                 "prompt": {"type": "string", "description": "Image description for creating from scratch"},
                 "style": {"type": "string", "enum": ["photorealistic", "artistic", "cinematic", "abstract"], "default": "photorealistic", "description": "Visual style for the generated image"},
-                "numImages": {"type": "integer", "minimum": 1, "maximum": 5, "default": 2}
+                "numImages": {"type": "integer", "minimum": 1, "maximum": 5, "description": "Number of images to generate. AI should decide based on user request. If not specified by user, default to 1."}
             },
             "required": ["prompt"]
         }
@@ -221,9 +234,14 @@ class ImageParameterMapper:
         """Build enhanced prompt combining base prompt with simplified user configuration"""
         # CRITICAL: Always add DANI description when detected (restore pre-Pareto logic)
         DANI_DESCRIPTION = "elegant healthy man, robust build, authoritative gaze, AI leader, 8K"
+        TRIGGER_WORD = "DANI"
 
-        # Check if DANI is mentioned and add character description
-        if "DANI" in base_prompt.upper():
+        # Ensure trigger word at the beginning (backend owns this)
+        if TRIGGER_WORD in base_prompt.upper():
+            # Remove any existing DANI mentions to avoid duplication
+            base_prompt_clean = base_prompt.replace(TRIGGER_WORD, "").replace(TRIGGER_WORD.lower(), "").strip()
+            base_prompt = f"{TRIGGER_WORD} {base_prompt_clean}"
+            # Add character description
             base_prompt = f"{base_prompt} ({DANI_DESCRIPTION})"
 
         if not config:
@@ -244,6 +262,18 @@ class ImageParameterMapper:
         if not enhanced_prompt.endswith('.'):
             enhanced_prompt += '.'
 
+        # ENFORCE MAX LENGTH to avoid GPU memory issues
+        MAX_PROMPT_LENGTH = 200
+        if len(enhanced_prompt) > MAX_PROMPT_LENGTH:
+            logger.warning(f"⚠️ Prompt too long ({len(enhanced_prompt)} chars), truncating to {MAX_PROMPT_LENGTH}")
+            # Keep core prompt + description, truncate style details
+            if TRIGGER_WORD in base_prompt.upper():
+                core = base_prompt.split('(')[0].strip()  # Keep base without description
+                enhanced_prompt = f"{core} ({DANI_DESCRIPTION})"
+                if len(enhanced_prompt) > MAX_PROMPT_LENGTH:
+                    enhanced_prompt = enhanced_prompt[:MAX_PROMPT_LENGTH-3] + "..."
+
+        logger.info(f"📏 Final prompt length: {len(enhanced_prompt)} chars")
         return enhanced_prompt
 
 async def translate_to_english(text: str) -> str:
@@ -829,10 +859,21 @@ def extract_prompt_fallback(json_str: str) -> Dict[str, Any]:
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     """Chat endpoint with AI agent and tool calling"""
+    pipeline_stages = []
+
     try:
         logger.info(f"💬 Chat request received: message='{request.message[:100]}...'")
-        logger.info(f"📝 Context: {len(request.messages)} history messages, {len(request.selectedImages) if request.selectedImages else 0} selected images")
+        logger.info(f"📝 Context: {len(request.messages)} history messages, {len(request.selectedImages) if request.selectedImages else 0} selected images, {len(request.pastedImages) if request.pastedImages else 0} pasted images")
         logger.info(f"⚙️ User config provided: {request.userConfig is not None}")
+
+        # Stage 1: Understanding request
+        pipeline_stages.append(PipelineStage(
+            id="stage_1",
+            name="Understanding Request",
+            icon="🤔",
+            status="complete",
+            message="Analyzing your message..."
+        ))
 
         # Build system prompt with selected images context
         system_content = SYSTEM_PROMPT
@@ -878,6 +919,16 @@ async def chat_endpoint(request: ChatRequest):
         user_message_content = []
         user_message_content.append({"type": "text", "text": request.message})
 
+        # Add pasted images for vision analysis (from clipboard Ctrl+V)
+        if request.pastedImages:
+            logger.info(f"📸 Adding {len(request.pastedImages)} pasted images for vision analysis")
+            for i, base64_img in enumerate(request.pastedImages):
+                user_message_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": base64_img}
+                })
+                logger.info(f"📸 Pasted Image {i+1}: [Base64 Screenshot]")
+
         # Add selected images for GPT-5 vision analysis if available
         if request.selectedImages:
             logger.info(f"👁️ Adding {len(request.selectedImages)} images for GPT-5 vision analysis")
@@ -904,9 +955,22 @@ async def chat_endpoint(request: ChatRequest):
             "content": user_message_content if len(user_message_content) > 1 else request.message
         })
 
+        # Stage 2: Thinking with AI
+        pipeline_stages.append(PipelineStage(
+            id="stage_2",
+            name="AI Thinking",
+            icon="🧠",
+            status="active",
+            message="Consulting GPT-4o..."
+        ))
+
         # Call OpenRouter
         data = await call_openrouter(messages)
         choice = data.get("choices", [{}])[0]
+
+        # Complete Stage 2
+        pipeline_stages[-1].status = "complete"
+        pipeline_stages[-1].message = "AI analyzed your request"
         response_msg = choice.get("message", {})
 
         # Debug: Log the full response structure
@@ -942,6 +1006,15 @@ async def chat_endpoint(request: ChatRequest):
 
             if tool_name == "generate_avatar":
                 try:
+                    # Stage 3: Generating images
+                    pipeline_stages.append(PipelineStage(
+                        id="stage_3",
+                        name="Generating Images",
+                        icon="🎨",
+                        status="active",
+                        message="Creating images with Flux + DANI LoRA..."
+                    ))
+
                     # Parse tool arguments
                     raw_args = tool_call["function"]["arguments"]
                     logger.info(f"🔍 Raw tool arguments: {raw_args}")
@@ -958,10 +1031,17 @@ async def chat_endpoint(request: ChatRequest):
                     # Generate images with user configuration
                     result = await call_generate_api(
                         args["prompt"],
-                        args.get("numImages", 3),
+                        args.get("numImages", 1),
                         request.userConfig,
                         request.selectedImages
                     )
+
+                    # Complete Stage 3
+                    pipeline_stages[-1].status = "complete"
+                    pipeline_stages[-1].message = f"✅ Generated {result.get('total', 0)} images!"
+
+                    # Get enhanced prompt from result
+                    enhanced_prompt = result.get('prompt', args['prompt'])
 
                     return ChatResponse(
                         response=f"✨ Generated {result['total']} images with DANI prompt '{args['prompt'][:100]}...' Check the gallery! 🎨",
@@ -969,7 +1049,10 @@ async def chat_endpoint(request: ChatRequest):
                         tool_result=result,
                         usage=data.get("usage"),
                         model=data.get("model"),
-                        reasoning_details=reasoning_details
+                        reasoning_details=reasoning_details,
+                        final_prompt=enhanced_prompt,
+                        prompt_length=len(enhanced_prompt),
+                        pipeline=pipeline_stages
                     )
                 except Exception as e:
                     return ChatResponse(response=f"❌ Error generating images: {str(e)}", reasoning_details=reasoning_details)
@@ -993,7 +1076,7 @@ async def chat_endpoint(request: ChatRequest):
                     result = await call_create_images_api(
                         args["prompt"],
                         args.get("style", "photorealistic"),
-                        args.get("numImages", 2),
+                        args.get("numImages", 1),
                         request.userConfig
                     )
 
@@ -1010,6 +1093,15 @@ async def chat_endpoint(request: ChatRequest):
 
             elif tool_name == "combine_images":
                 try:
+                    # Stage 3: Combining images
+                    pipeline_stages.append(PipelineStage(
+                        id="stage_3",
+                        name="Combining Images",
+                        icon="🔄",
+                        status="active",
+                        message="Downloading and combining images with Nano Banana..."
+                    ))
+
                     # Parse tool arguments
                     raw_args = tool_call["function"]["arguments"]
                     logger.info(f"🔍 Raw combine tool arguments: {raw_args}")
@@ -1050,13 +1142,23 @@ async def chat_endpoint(request: ChatRequest):
                     if num_variations > 1:
                         variations_text = f" ({num_variations} variations)"
 
+                    # Complete Stage 3
+                    pipeline_stages[-1].status = "complete"
+                    pipeline_stages[-1].message = f"✅ Combined {len(args.get('image_urls', []))} images!"
+
+                    # Get final prompt used
+                    final_combine_prompt = result.get('prompt', args['prompt'])
+
                     return ChatResponse(
                         response=f"🔄 Combined {len(args['image_urls'])} images successfully{variations_text}! '{args['prompt'][:100]}...' Check the gallery! ✨",
                         tool_used="combine_images",
                         tool_result=result,
                         usage=data.get("usage"),
                         model=data.get("model"),
-                        reasoning_details=reasoning_details
+                        reasoning_details=reasoning_details,
+                        final_prompt=final_combine_prompt,
+                        prompt_length=len(final_combine_prompt),
+                        pipeline=pipeline_stages
                     )
                 except Exception as e:
                     return ChatResponse(response=f"❌ Error combining images: {str(e)}", reasoning_details=reasoning_details)
