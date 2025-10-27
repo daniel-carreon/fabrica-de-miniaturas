@@ -400,13 +400,9 @@ async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
                 "tools": TOOLS,
                 "tool_choice": "auto",
                 "max_tokens": 5000,  # Increased for long URL arrays
-                "reasoning": {
-                    "effort": "medium",  # Optimal balance for tool calling
-                    "verbosity": 0.7,    # Detailed but not verbose responses
-                    "exclude": False     # Show reasoning process to user
-                },
+                # ⚠️ REMOVED: "reasoning" field (not valid for gpt-4o, only for o1/o3)
                 "temperature": 0.3,  # Balanced for agentic decision-making (was 0.1)
-                "top_p": 0.5
+                "top_p": 0.95  # Increased from 0.5 to allow more model diversity in tool selection
             }
 
             logger.info(f"📤 OpenRouter payload: model={payload['model']}, messages={len(payload['messages'])}, tools={len(payload['tools'])}")
@@ -1038,6 +1034,23 @@ async def chat_endpoint(request: ChatRequest):
             message="Consulting GPT-4o..."
         ))
 
+        # 🚨 DEBUG: Log exactly what system prompt is being sent
+        system_msg = messages[0] if messages else {}
+        system_content_preview = system_msg.get("content", "")[:500]
+        logger.info(f"🎯 SYSTEM PROMPT PREVIEW (first 500 chars): {system_content_preview}...")
+        if "SELECTED IMAGES CONTEXT" in system_msg.get("content", ""):
+            logger.info(f"✅ SELECTED IMAGES CONTEXT IS IN SYSTEM PROMPT")
+            # Extract and log the selected images section
+            full_content = system_msg.get("content", "")
+            selected_start = full_content.find("SELECTED IMAGES CONTEXT")
+            selected_end = full_content.find("\n\n", selected_start)
+            if selected_end == -1:
+                selected_end = len(full_content)
+            selected_section = full_content[selected_start:min(selected_end, selected_start+500)]
+            logger.info(f"📸 SELECTED IMAGES SECTION: {selected_section}...")
+        else:
+            logger.warning(f"⚠️ NO SELECTED IMAGES CONTEXT IN SYSTEM PROMPT - This is the problem!")
+
         # Call OpenRouter
         data = await call_openrouter(messages)
         choice = data.get("choices", [{}])[0]
@@ -1238,8 +1251,23 @@ async def chat_endpoint(request: ChatRequest):
                     return ChatResponse(response=f"❌ Error combining images: {str(e)}", reasoning_details=reasoning_details)
 
         # No tool call - return text response
+        # 🚨 DEBUG: Agent refused to call a tool, let's understand why
+        agent_response = response_msg.get("content", "I apologize, but I could not generate a response.")
+        logger.warning(f"⚠️ NO TOOL CALLED - Agent response: '{agent_response}'")
+
+        # Check if this is the "no puedo ayudar" scenario
+        if "no puedo" in agent_response.lower() or "cannot" in agent_response.lower():
+            logger.error(f"🚨 AGENT REFUSED REQUEST: '{agent_response}'")
+            logger.error(f"🚨 Debug info:")
+            logger.error(f"   - Messages sent: {len(messages)}")
+            logger.error(f"   - Tools available: {len(TOOLS)}")
+            logger.error(f"   - Tools: {[t['function']['name'] for t in TOOLS]}")
+            logger.error(f"   - Selected images in request: {len(request.selectedImages) if request.selectedImages else 0}")
+            if request.selectedImages:
+                logger.error(f"   - Selected image URLs: {[img.url[:80] for img in request.selectedImages]}")
+
         return ChatResponse(
-            response=response_msg.get("content", "I apologize, but I could not generate a response."),
+            response=agent_response,
             usage=data.get("usage"),
             model=data.get("model"),
             reasoning_details=reasoning_details
