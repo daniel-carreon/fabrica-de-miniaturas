@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.chat_router import router as chat_router
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -54,4 +55,7 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Get port from environment variable (default: 8000)
+    backend_port = int(os.getenv("BACKEND_PORT", "8000"))
+    logger.info(f"🚀 Starting backend on port {backend_port}")
+    uvicorn.run(app, host="0.0.0.0", port=backend_port)

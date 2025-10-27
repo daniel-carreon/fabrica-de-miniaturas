@@ -1,16 +1,50 @@
 #!/usr/bin/env node
 /**
- * Auto-detect available port and start Next.js dev server
- * Tries ports 3000-3006 automatically
+ * Smart Next.js dev server starter
+ *
+ * Priority:
+ * 1. Use PORT from .env.local (if configured)
+ * 2. Use PORT from CLI/environment
+ * 3. Auto-detect first available port
+ *
+ * This allows: npm run dev (no CLI params needed)
  */
 const { spawn } = require('child_process');
 const net = require('net');
+const fs = require('fs');
+const path = require('path');
 
 const MIN_PORT = 3000;
 const MAX_PORT = 3006;
 
 /**
- * Check if a port is available (checks both IPv4 and IPv6)
+ * Parse .env.local file (simple parser for PORT variable)
+ */
+function readPortFromEnv() {
+  const envPath = path.join(process.cwd(), '.env.local');
+
+  try {
+    if (!fs.existsSync(envPath)) {
+      return null;
+    }
+
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const portMatch = envContent.match(/^PORT=(\d+)$/m);
+
+    if (portMatch && portMatch[1]) {
+      const port = parseInt(portMatch[1], 10);
+      console.log(`📖 Read PORT from .env.local: ${port}`);
+      return port;
+    }
+  } catch (error) {
+    console.warn(`⚠️  Could not read .env.local: ${error.message}`);
+  }
+
+  return null;
+}
+
+/**
+ * Check if a port is available
  */
 function isPortAvailable(port) {
   return new Promise((resolve) => {
@@ -29,8 +63,6 @@ function isPortAvailable(port) {
       resolve(true);
     });
 
-    // Listen on all interfaces (both IPv4 and IPv6)
-    // This matches Next.js behavior which binds to ::
     server.listen(port, '0.0.0.0');
   });
 }
@@ -49,16 +81,47 @@ async function findAvailablePort() {
 }
 
 /**
- * Start Next.js dev server on available port
+ * Start Next.js dev server
  */
 async function startDevServer() {
   try {
-    const port = await findAvailablePort();
+    let port = null;
+
+    // Priority 1: Try PORT from .env.local
+    const envPort = readPortFromEnv();
+    if (envPort) {
+      const available = await isPortAvailable(envPort);
+      if (available) {
+        port = envPort;
+        console.log(`✅ Using port ${port} from .env.local\n`);
+      } else {
+        console.warn(`⚠️  Port ${envPort} from .env.local is already in use`);
+        console.warn(`🔍 Auto-detecting available port...\n`);
+      }
+    }
+
+    // Priority 2: Try PORT from environment/CLI
+    if (!port && process.env.PORT) {
+      const cliPort = parseInt(process.env.PORT, 10);
+      const available = await isPortAvailable(cliPort);
+      if (available) {
+        port = cliPort;
+        console.log(`✅ Using port ${port} from environment\n`);
+      }
+    }
+
+    // Priority 3: Auto-detect
+    if (!port) {
+      port = await findAvailablePort();
+      console.log(`✅ Auto-detected available port: ${port}\n`);
+    }
+
     const backendPort = 8000 + (port - 3000); // 3000→8000, 3001→8001, etc.
 
-    console.log(`\n🚀 Starting Next.js on port ${port}...`);
-    console.log(`💡 Expected backend port: ${backendPort}`);
-    console.log(`   Run: cd ../backend && python dev_server.py\n`);
+    console.log(`🚀 Starting Next.js dev server...`);
+    console.log(`📍 Frontend: http://localhost:${port}`);
+    console.log(`📍 Backend:  http://localhost:${backendPort}`);
+    console.log(`💡 Tip: Edit PORT in .env.local to change dev port\n`);
 
     const nextDev = spawn('./node_modules/.bin/next', ['dev', '-p', port.toString()], {
       stdio: 'inherit',
@@ -66,12 +129,12 @@ async function startDevServer() {
       env: {
         ...process.env,
         PORT: port.toString(),
-        NEXT_PUBLIC_API_URL: `http://localhost:${backendPort}`
+        NEXT_PUBLIC_BACKEND_URL: `http://localhost:${backendPort}`
       }
     });
 
     nextDev.on('error', (error) => {
-      console.error('Failed to start Next.js:', error);
+      console.error('❌ Failed to start Next.js:', error);
       process.exit(1);
     });
 

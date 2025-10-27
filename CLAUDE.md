@@ -524,28 +524,17 @@ SUPABASE_SERVICE_KEY=your_supabase_service_key_here
 
 #### Configuración MCP
 ```json
-// mcp.json
+// .mcp.json (en raíz del proyecto)
 {
   "mcpServers": {
     "supabase": {
-      "command": "npx",
-      "args": ["@supabase/mcp-server"],
-      "env": {
-        "SUPABASE_URL": "${SUPABASE_URL}",
-        "SUPABASE_KEY": "${SUPABASE_SERVICE_KEY}"
-      }
-    },
-    "n8n": {
-      "command": "npx",
-      "args": ["@n8n/mcp-server"],
-      "env": {
-        "N8N_API_KEY": "${N8N_API_KEY}",
-        "N8N_BASE_URL": "${N8N_WEBHOOK_URL}"
-      }
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=${SUPABASE_PROJECT_ID}&read_only=true"
     }
   }
 }
 ```
+**⚠️ AUTENTICACIÓN CRÍTICA:** El primer acceso a Supabase MCP abre automáticamente un navegador para login OAuth. Selecciona tu organización y autoriza. Claude Code luego tiene acceso a tu proyecto.
 
 ### 🔄 Automated Workflow Examples
 

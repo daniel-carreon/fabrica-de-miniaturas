@@ -1,9 +1,12 @@
 /**
  * Port detection utility for dynamic backend connection
- * Automatically finds available backend port
+ *
+ * SMART SYNC: Frontend (3000-3006) ↔ Backend (8000-8006)
+ * Formula: BACKEND_PORT = 8000 + (FRONTEND_PORT - 3000)
+ * Example: 3001 ↔ 8001, 3002 ↔ 8002
  */
 
-const BACKEND_PORTS = [8002, 8000, 8001, 8003, 8004]
+const BACKEND_PORTS = [8001, 8000, 8002, 8003, 8004]
 
 interface PortTestResult {
   port: number

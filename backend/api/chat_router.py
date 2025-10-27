@@ -114,12 +114,32 @@ TOOLS = [
     "type": "function",
     "function": {
         "name": "generate_avatar",
-        "description": "Generate personalized avatar images using the DANI fine-tuned model (for portraits with Daniel's identity)",
+        "description": """Generate personalized images using DANI fine-tuned model.
+
+        USE WHEN:
+        - User explicitly mentions "DANI" (trigger word)
+        - Personal portraits, avatars, headshots
+        - User says "mi imagen", "mi retrato", "mi avatar"
+        - Thumbnails/miniaturas that INCLUDE DANI's face
+
+        DO NOT USE FOR:
+        - Generic images without DANI identity
+        - Landscapes, objects, scenes
+        - Thumbnails that are generic graphics/text only (use create_images instead)
+        """,
         "parameters": {
             "type": "object",
             "properties": {
-                "prompt": {"type": "string", "description": "Image description"},
-                "numImages": {"type": "integer", "minimum": 1, "maximum": 10, "description": "Number of images to generate. AI should decide based on user request. If not specified by user, default to 1."}
+                "prompt": {
+                    "type": "string",
+                    "description": "Concise image description (max 200 chars). Will be auto-enhanced with DANI physical description."
+                },
+                "numImages": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "Number of image variations to generate. AI should decide based on user request. If not specified by user, default to 1."
+                }
             },
             "required": ["prompt"]
         }
@@ -129,13 +149,39 @@ TOOLS = [
     "type": "function",
     "function": {
         "name": "create_images",
-        "description": "Create general images from scratch without specific identity (landscapes, objects, scenes, thumbnails, artwork - use when NO \"DANI\" mentioned)",
+        "description": """Create general images from scratch WITHOUT specific person identity.
+
+        USE WHEN:
+        - NO "DANI" mention in user request
+        - Generic graphics, artwork, illustrations
+        - Landscapes, cityscapes, objects, scenes
+        - Abstract art, photorealistic scenes
+        - Generic YouTube thumbnails (text + graphics only, NO personal face)
+
+        DO NOT USE FOR:
+        - Images that should include DANI → use generate_avatar instead
+        - Combining existing images → use combine_images instead
+        - Personal portraits or avatars
+        """,
         "parameters": {
             "type": "object",
             "properties": {
-                "prompt": {"type": "string", "description": "Image description for creating from scratch"},
-                "style": {"type": "string", "enum": ["photorealistic", "artistic", "cinematic", "abstract"], "default": "photorealistic", "description": "Visual style for the generated image"},
-                "numImages": {"type": "integer", "minimum": 1, "maximum": 5, "description": "Number of images to generate. AI should decide based on user request. If not specified by user, default to 1."}
+                "prompt": {
+                    "type": "string",
+                    "description": "Detailed description of what to create from scratch"
+                },
+                "style": {
+                    "type": "string",
+                    "enum": ["photorealistic", "artistic", "cinematic", "abstract"],
+                    "default": "photorealistic",
+                    "description": "Visual style for the generated image. Default: photorealistic"
+                },
+                "numImages": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "description": "Number of image variations to generate. AI should decide based on user request. If not specified by user, default to 1."
+                }
             },
             "required": ["prompt"]
         }
@@ -145,20 +191,48 @@ TOOLS = [
     "type": "function",
     "function": {
         "name": "combine_images",
-        "description": "Combine multiple existing images from the gallery using Nano Banana (Gemini 2.5 Flash). Can handle 2-8 images and generate multiple variations.",
+        "description": """Combine 2-8 existing images from the gallery using Nano Banana AI.
+
+        USE WHEN:
+        - User has selectedImages in context (2-8 images)
+        - User says "combina", "mezcla", "fusiona", "une"
+        - Creating thumbnails FROM existing images
+        - User says "usa estas imágenes para..."
+        - "genera usando estas imágenes" (use combine_images, NOT generate_avatar!)
+
+        DO NOT USE FOR:
+        - Creating images from scratch → use generate_avatar or create_images instead
+        - User has NO selectedImages
+        - Single image manipulation (not supported)
+
+        REQUIRES: User must have 2-8 images selected in gallery
+        """,
         "parameters": {
             "type": "object",
             "properties": {
                 "image_urls": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Array of image URLs to combine (minimum 2, maximum 8 images)",
+                    "description": "Array of image URLs from selectedImages context. Use ALL selectedImages URLs.",
                     "minItems": 2,
                     "maxItems": 8
                 },
-                "prompt": {"type": "string", "description": "Instructions for how to combine the images"},
-                "num_variations": {"type": "integer", "minimum": 1, "maximum": 5, "default": 1, "description": "Number of different combination variations to generate"},
-                "output_name": {"type": "string", "description": "Name for the resulting combined images", "default": "combined_image"}
+                "prompt": {
+                    "type": "string",
+                    "description": "Instructions for how to combine the images (e.g., 'DANI on Budapest Parliament background', 'merge these for YouTube thumbnail')"
+                },
+                "num_variations": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "default": 1,
+                    "description": "Number of different combination variations to generate. Default: 1"
+                },
+                "output_name": {
+                    "type": "string",
+                    "description": "Name for the resulting combined images (e.g., 'youtube_thumbnail', 'profile_banner')",
+                    "default": "combined_image"
+                }
             },
             "required": ["image_urls", "prompt"]
         }
@@ -331,7 +405,7 @@ async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
                     "verbosity": 0.7,    # Detailed but not verbose responses
                     "exclude": False     # Show reasoning process to user
                 },
-                "temperature": 0.1,
+                "temperature": 0.3,  # Balanced for agentic decision-making (was 0.1)
                 "top_p": 0.5
             }
 

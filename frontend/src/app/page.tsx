@@ -683,10 +683,8 @@ export default function HomePage() {
               <button
                 onClick={() => {
                   setCombineMode(!combineMode)
-                  // Clear selection when switching modes for better UX
-                  if (selectedImages.length > 0) {
-                    clearSelection()
-                  }
+                  // ✅ Keep selection when switching modes - better UX
+                  // User can select images and toggle between combine/delete without losing selection
                 }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border-2 flex items-center gap-2 shadow-lg ${
                   combineMode
