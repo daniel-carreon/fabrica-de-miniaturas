@@ -9,6 +9,7 @@ import ImageCard from '@/components/ui/ImageCard'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
 import PromptsPanel from '@/components/ui/PromptsPanel'
 import TabsNavigator from '@/components/ui/TabsNavigator'
+import { ConversationPanel } from '@/features/chat/components/ConversationPanel'
 
 interface ApiResponse {
   images: Array<{
@@ -670,7 +671,12 @@ export default function HomePage() {
 
 
   return (
-    <div className="space-y-8 max-w-screen-2xl mx-auto px-4 overflow-x-hidden">
+    <div className="flex h-screen bg-black">
+      {/* Conversation Sidebar */}
+      <ConversationPanel />
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto space-y-8 max-w-screen-2xl mx-auto px-4 py-8">
       {/* Modern Tabs Navigation */}
       <GlassCard variant="dark" className="purple-glow">
         <div className="space-y-4">
@@ -1502,6 +1508,9 @@ export default function HomePage() {
           animation: fade-in 0.3s ease-out;
         }
       `}</style>
+      </div>
+      {/* End of main content area */}
     </div>
+    {/* End of flex layout with sidebar */}
   )
 }

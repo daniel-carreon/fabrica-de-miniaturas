@@ -5,6 +5,7 @@ import { useChatStore, ChatMessage } from '../stores/chatStore'
 import { useImageStore } from '@/shared/stores/imageStore'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
 import { useImageConfig } from '@/shared/stores/imageConfigStore'
+import { useConversationStore } from '@/shared/stores/conversationStore'
 import { backendFetch } from '@/shared/lib/portDetection'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
@@ -43,9 +44,25 @@ export default function ChatAgent() {
   const { selectedImages, clearSelection, handleImageSelect } = useSelectedImages()
   const { config, updateConfig, activePreset } = useImageConfig()
 
+  // Conversation management
+  const {
+    currentConversationId,
+    createConversation,
+    setCurrentConversation,
+    addMessage: addConversationMessage
+  } = useConversationStore()
+
   // 🔄 Load images from database on component mount (fixes refresh issue)
+  // And initialize conversation if needed
   useEffect(() => {
     loadImagesFromDatabase()
+
+    // Initialize conversation: create new if none exists
+    if (!currentConversationId) {
+      createConversation().catch(err => {
+        console.error('❌ Failed to create initial conversation:', err)
+      })
+    }
   }, [])
 
   const handleCopy = async (text: string, messageId: string) => {
@@ -123,6 +140,7 @@ export default function ChatAgent() {
         method: 'POST',
         body: JSON.stringify({
           message: userMessage.content,
+          conversation_id: currentConversationId, // Include conversation context
           messages: messages, // Context history
           selectedImages: selectedImages, // Include selected images for combination tool
           userConfig: config, // Include user configuration for enhanced prompts

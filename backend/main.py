@@ -5,6 +5,8 @@ Main application with chat agent integration
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.chat_router import router as chat_router
+from api.conversation_router import router as conversation_router
+from api.chat_v2_router import router as chat_v2_router
 import logging
 import os
 
@@ -41,7 +43,9 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(chat_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")  # Original chat endpoint (OpenRouter)
+app.include_router(chat_v2_router, prefix="/api")  # New chat endpoint (Pydantic AI)
+app.include_router(conversation_router, prefix="/api")  # Conversation management endpoints
 
 @app.get("/")
 async def root():
