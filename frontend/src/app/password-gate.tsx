@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import GlassCard from '@/components/ui/glass-card'
 
-const CORRECT_PASSWORD = 'PQOW8*urie3'
+const CORRECT_PASSWORD = '123321'
 const STORAGE_KEY = 'fabrica_auth'
 
 export default function PasswordGate({ children }: { children: React.ReactNode }) {

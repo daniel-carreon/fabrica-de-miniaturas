@@ -4,9 +4,10 @@ These models map directly to Supabase tables and support both ORM and API serial
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 from uuid import UUID
-from sqlmodel import SQLModel, Field, JSON
+from sqlalchemy import Column, JSON, text
+from sqlmodel import SQLModel, Field, Relationship
 from pydantic import BaseModel, Field as PydanticField
 
 
@@ -18,7 +19,6 @@ class ConversationBase(SQLModel):
     """Base fields for Conversation model"""
     title: str = Field(index=True, default="Nueva Conversación")
     is_favorite: bool = Field(default=False, index=True)
-    metadata: Optional[dict] = Field(default={}, sa_column_type=JSON)
     user_id: str = Field(default="daniel", index=True)
 
 
@@ -32,10 +32,6 @@ class Conversation(ConversationBase, table=True):
     id: UUID = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-    # Relationships (if using SQLModel with Relationships)
-    messages: List["ChatMessage"] = []
-    images: List["ConversationImage"] = []
 
 
 class ConversationCreate(ConversationBase):
@@ -65,10 +61,6 @@ class ChatMessageBase(SQLModel):
     role: str = Field(index=True)  # user, assistant, system
     content: str
     tool_used: Optional[str] = Field(default=None, index=True)
-    tool_arguments: Optional[dict] = Field(default=None, sa_column_type=JSON)
-    tool_result: Optional[dict] = Field(default=None, sa_column_type=JSON)
-    reasoning_details: Optional[dict] = Field(default=None, sa_column_type=JSON)
-    usage: Optional[dict] = Field(default={}, sa_column_type=JSON)  # Token usage
     model: Optional[str] = None
 
 
@@ -83,9 +75,6 @@ class ChatMessage(ChatMessageBase, table=True):
     conversation_id: UUID = Field(foreign_key="conversations.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     message_index: Optional[int] = None
-
-    # Relationship
-    conversation: Optional[Conversation] = None
 
 
 class ChatMessageCreate(ChatMessageBase):
@@ -111,7 +100,6 @@ class ConversationImageBase(SQLModel):
     supabase_url: Optional[str] = None
     prompt: Optional[str] = None
     tool_used: Optional[str] = Field(default=None, index=True)
-    tags: Optional[List[str]] = Field(default=[], sa_column_type=JSON)
     quality_score: Optional[float] = None
 
 
@@ -129,9 +117,6 @@ class ConversationImage(ConversationImageBase, table=True):
         index=True
     )
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-
-    # Relationship
-    conversation: Optional[Conversation] = None
 
 
 class ConversationImageCreate(ConversationImageBase):

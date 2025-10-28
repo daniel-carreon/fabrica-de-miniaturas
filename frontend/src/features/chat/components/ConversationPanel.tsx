@@ -15,10 +15,11 @@ export function ConversationPanel() {
     setCurrentConversation,
     deleteConversation,
     toggleFavorite,
-    clearError
+    clearError,
+    isPanelOpen,
+    togglePanel
   } = useConversationStore()
 
-  const [isOpen, setIsOpen] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
 
@@ -29,7 +30,7 @@ export function ConversationPanel() {
   const handleNewConversation = async () => {
     try {
       await createConversation()
-      setIsOpen(true)
+      if (!isPanelOpen) togglePanel()
     } catch (e) {
       console.error('Failed to create conversation')
     }
@@ -77,17 +78,17 @@ export function ConversationPanel() {
     <>
       {/* Mobile Toggle Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={togglePanel}
         className="fixed top-4 left-4 z-50 p-2 rounded-lg lg:hidden bg-gray-800 text-white hover:bg-gray-700"
         aria-label="Toggle sidebar"
       >
-        {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        {isPanelOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
 
       {/* Sidebar */}
       <aside
         className={`fixed left-0 top-0 h-screen w-64 bg-gray-900 text-white flex flex-col z-40 transition-transform duration-300 ease-in-out transform lg:relative lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          isPanelOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Header */}
@@ -229,10 +230,10 @@ export function ConversationPanel() {
       </aside>
 
       {/* Overlay for mobile */}
-      {isOpen && (
+      {isPanelOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-          onClick={() => setIsOpen(false)}
+          onClick={togglePanel}
         />
       )}
     </>

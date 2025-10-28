@@ -6,8 +6,9 @@ Provides conversation-aware chat agent with tool calling for image generation an
 import logging
 import os
 from typing import Optional
-from pydantic_ai import Agent, RunContext, ModelSettings
-from pydantic_ai.models.openrouter import OpenRouterModel
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.models import ModelSettings
+from pydantic_ai.models.openai import OpenAIModel
 
 from domain.models import (
     ConversationCreate,
@@ -61,8 +62,8 @@ class ChatService:
         # Create agent with OpenRouter model
         agent = Agent[ChatDependencies](
             model=self._get_model(),
-            instructions=SYSTEM_PROMPT,
-            system_prompt_template='User: {user_id} | Conversation: {conversation_id}',
+            system_prompt=SYSTEM_PROMPT,
+            deps_type=ChatDependencies,
         )
 
         # Register tool: generate_images
@@ -189,22 +190,24 @@ class ChatService:
 
     def _get_model(self):
         """Get the model configuration based on environment"""
-        model_config = os.getenv('LLM_MODEL', 'openrouter:gpt-5-mini')
+        model_config = os.getenv('LLM_MODEL', 'openrouter/openai/gpt-5-mini')
+        api_key = os.getenv('OPENROUTER_API_KEY')
 
-        if model_config.startswith('openrouter:'):
-            model_name = model_config.replace('openrouter:', '')
-            api_key = os.getenv('OPENROUTER_API_KEY')
+        if not api_key:
+            logger.warning("OPENROUTER_API_KEY not set, using GPT fallback")
+            # Fallback to Claude if OpenRouter key not available
+            api_key_anthropic = os.getenv('ANTHROPIC_API_KEY')
+            if api_key_anthropic:
+                return 'claude-3-5-sonnet-20241022'
+            return 'gpt-4o'
 
-            if not api_key:
-                logger.warning("OPENROUTER_API_KEY not set, using default model")
-                return 'openrouter:gpt-5-mini'
-
-            return OpenRouterModel(
-                model_id=model_name,
-                api_key=api_key,
-            )
-
-        return model_config
+        # Use OpenAI model class with OpenRouter as provider
+        # OpenRouter proxies to various models via OpenAI API compatibility layer
+        return OpenAIModel(
+            model_name=model_config,
+            api_key=api_key,
+            base_url='https://openrouter.ai/api/v1'
+        )
 
     async def chat(
         self,

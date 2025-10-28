@@ -49,7 +49,9 @@ export default function ChatAgent() {
     currentConversationId,
     createConversation,
     setCurrentConversation,
-    addMessage: addConversationMessage
+    addMessage: addConversationMessage,
+    isPanelOpen,
+    togglePanel
   } = useConversationStore()
 
   // 🔄 Load images from database on component mount (fixes refresh issue)
@@ -310,24 +312,37 @@ export default function ChatAgent() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
+      {/* Header - Nueva Conversación + Ver Todas */}
       <GlassCard variant="dark" className="purple-glow mb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg md:text-xl font-bold text-white">🤖 AI Assistant</h2>
-            <p className="text-xs md:text-sm text-purple-200 hidden sm:block">Powered by OpenRouter</p>
-          </div>
-          {/* Clear button only on desktop */}
-          <div className="hidden md:block">
-            <LiquidButton
-              onClick={clearMessages}
-              variant="space"
-              size="sm"
-              className="text-xs"
-            >
-              🗑️ Clear
-            </LiquidButton>
-          </div>
+        <div className="flex items-center gap-2">
+          {/* Nueva Conversación Button */}
+          <LiquidButton
+            onClick={async () => {
+              try {
+                await createConversation()
+                console.log('✅ Nueva conversación creada')
+              } catch (e) {
+                console.error('❌ Failed to create conversation')
+              }
+            }}
+            variant="space"
+            size="sm"
+            className="flex-1 text-sm font-medium"
+          >
+            ➕ Nueva
+          </LiquidButton>
+
+          {/* Ver Todas Button - Toggles ConversationPanel */}
+          <LiquidButton
+            onClick={togglePanel}
+            variant="space"
+            size="sm"
+            className={`flex-1 text-sm font-medium ${
+              isPanelOpen ? 'ring-2 ring-purple-400' : ''
+            }`}
+          >
+            📋 Ver Todas
+          </LiquidButton>
         </div>
       </GlassCard>
 

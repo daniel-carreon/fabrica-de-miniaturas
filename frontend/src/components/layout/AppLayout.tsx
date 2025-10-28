@@ -76,33 +76,28 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col">
-          {/* Header with Chat Toggle */}
+          {/* Minimal Header - Bot left, Settings right */}
           <header className="border-b border-white/10 bg-black/20 backdrop-blur-md shrink-0">
-            <div className="px-4 py-3 md:py-6">
+            <div className="px-4 py-3">
               <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h1 className="text-xl md:text-3xl font-bold text-white purple-glow">
-                    🏭 Fábrica de Miniaturas
-                  </h1>
-                  <p className="text-xs md:text-sm text-purple-200 mt-1 hidden sm:block">
-                    Generador de imágenes impulsado por IA
-                  </p>
-                </div>
+                {/* LEFT: AI Assistant Toggle */}
+                <div className="flex items-center gap-2">
+                  {/* Desktop AI Assistant Toggle */}
+                  <div className="hidden lg:block">
+                    <LiquidButton
+                      onClick={() => setIsChatOpen(!isChatOpen)}
+                      variant="space"
+                      size="lg"
+                      className={`w-12 h-12 rounded-full flex items-center justify-center p-0 ${
+                        isChatOpen ? 'ring-2 ring-purple-400' : ''
+                      }`}
+                      title="Toggle AI Assistant"
+                    >
+                      <Bot className="w-6 h-6" />
+                    </LiquidButton>
+                  </div>
 
-                <div className="flex items-center gap-2 md:gap-3">
-                  {/* Image Configuration Toggle */}
-                  <LiquidButton
-                    onClick={() => setIsConfigOpen(!isConfigOpen)}
-                    variant="space"
-                    size="lg"
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center p-0 ${
-                      isConfigOpen ? 'ring-2 ring-purple-400' : ''
-                    }`}
-                  >
-                    <Settings className="w-5 h-5 md:w-6 md:h-6" />
-                  </LiquidButton>
-
-                  {/* Tablet/Mobile Toggle Button - Shows different icon based on current view */}
+                  {/* Tablet/Mobile Toggle Button */}
                   <div className="lg:hidden">
                     <LiquidButton
                       onClick={() => {
@@ -115,6 +110,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       className={`w-10 h-10 rounded-full flex items-center justify-center p-0 ${
                         mobileView === 'chat' ? 'ring-2 ring-purple-400' : ''
                       }`}
+                      title="Toggle View"
                     >
                       {mobileView === 'dashboard' ? (
                         <Bot className="w-5 h-5" />
@@ -123,20 +119,21 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       )}
                     </LiquidButton>
                   </div>
+                </div>
 
-                  {/* Desktop AI Assistant Toggle - Hidden on tablet/mobile */}
-                  <div className="hidden lg:block">
-                    <LiquidButton
-                      onClick={() => setIsChatOpen(!isChatOpen)}
-                      variant="space"
-                      size="lg"
-                      className={`w-12 h-12 rounded-full flex items-center justify-center p-0 ${
-                        isChatOpen ? 'ring-2 ring-purple-400' : ''
-                      }`}
-                    >
-                      <Bot className="w-6 h-6" />
-                    </LiquidButton>
-                  </div>
+                {/* RIGHT: Settings */}
+                <div className="flex items-center gap-2 md:gap-3">
+                  <LiquidButton
+                    onClick={() => setIsConfigOpen(!isConfigOpen)}
+                    variant="space"
+                    size="lg"
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center p-0 ${
+                      isConfigOpen ? 'ring-2 ring-purple-400' : ''
+                    }`}
+                    title="Image Configuration"
+                  >
+                    <Settings className="w-5 h-5 md:w-6 md:h-6" />
+                  </LiquidButton>
                 </div>
               </div>
             </div>

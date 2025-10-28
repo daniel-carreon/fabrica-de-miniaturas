@@ -246,10 +246,7 @@ async def create_message(
             role=message.role,
             content=message.content,
             tool_used=message.tool_used,
-            tool_result=message.tool_result,
-            reasoning_details=message.reasoning_details,
-            usage=message.usage,
-            model=message.model
+            model=getattr(message, 'model', None)
         )
 
         logger.info(f"✅ Created message in conversation: {conversation_id}")

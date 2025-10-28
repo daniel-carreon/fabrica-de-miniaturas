@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useImageStore } from '@/shared/stores/imageStore'
+import { useConversationStore } from '@/shared/stores/conversationStore'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
 import { Download, Maximize2, Heart, Upload, FileImage, Trash2, Tag, Clock } from 'lucide-react'
@@ -80,6 +81,9 @@ export default function HomePage() {
   const [combineMode, setCombineMode] = useState(true)
   // Tabs system
   const [activeTab, setActiveTab] = useState('generated')
+
+  // Conversation panel state from store
+  const { isPanelOpen } = useConversationStore()
 
   // Data states
   const [favorites, setFavorites] = useState<FavoriteImage[]>([])
@@ -672,13 +676,13 @@ export default function HomePage() {
 
   return (
     <div className="flex h-screen bg-black">
-      {/* Conversation Sidebar */}
-      <ConversationPanel />
+      {/* Conversation Sidebar - Only show when isPanelOpen is true */}
+      {isPanelOpen && <ConversationPanel />}
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto space-y-8 max-w-screen-2xl mx-auto px-4 py-8">
-      {/* Modern Tabs Navigation */}
-      <GlassCard variant="dark" className="purple-glow">
+        {/* Modern Tabs Navigation */}
+        <GlassCard variant="dark" className="purple-glow">
         <div className="space-y-4">
           {/* Header with selection info */}
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1509,8 +1513,6 @@ export default function HomePage() {
         }
       `}</style>
       </div>
-      {/* End of main content area */}
     </div>
-    {/* End of flex layout with sidebar */}
   )
 }

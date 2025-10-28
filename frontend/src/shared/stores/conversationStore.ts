@@ -28,6 +28,7 @@ interface ConversationStore {
   currentMessages: ConversationMessage[]
   loading: boolean
   error: string | null
+  isPanelOpen: boolean
 
   // Actions
   loadConversations: () => Promise<void>
@@ -39,9 +40,10 @@ interface ConversationStore {
   deleteConversation: (id: string) => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
   clearError: () => void
+  togglePanel: () => void
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8001'
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
 
 export const useConversationStore = create<ConversationStore>((set, get) => ({
   // Initial state
@@ -50,6 +52,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   currentMessages: [],
   loading: false,
   error: null,
+  isPanelOpen: true, // Start with panel visible by default
 
   // Load all conversations
   loadConversations: async () => {
@@ -200,5 +203,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   },
 
   // Clear error
-  clearError: () => set({ error: null })
+  clearError: () => set({ error: null }),
+
+  // Toggle conversation panel visibility
+  togglePanel: () => set((state) => ({ isPanelOpen: !state.isPanelOpen }))
 }))
