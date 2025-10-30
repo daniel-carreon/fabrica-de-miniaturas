@@ -4,12 +4,16 @@ import React from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Check, Copy } from 'lucide-react'
+import { StreamingCursor } from './StreamingCursor'
+import { ReasoningViewer } from './ReasoningViewer'
 
 interface MessageRendererProps {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  reasoning?: string  // Extended Thinking reasoning content
+  isStreaming?: boolean  // Whether message is being streamed
   onCopy?: (content: string, messageId: string) => void
   copiedMessageId?: string
 }
@@ -31,6 +35,8 @@ export function MessageRenderer({
   role,
   content,
   timestamp,
+  reasoning,
+  isStreaming = false,
   onCopy,
   copiedMessageId,
 }: MessageRendererProps) {
@@ -38,7 +44,17 @@ export function MessageRenderer({
   const isAssistant = role === 'assistant'
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+    <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} mb-4`}>
+      {/* Reasoning Viewer - only for assistant messages with reasoning */}
+      {isAssistant && reasoning && (
+        <ReasoningViewer
+          content={reasoning}
+          isStreaming={isStreaming && !content}
+          className="mb-2 max-w-[80%]"
+        />
+      )}
+
+      {/* Message Bubble */}
       <div
         className={`max-w-[80%] ${
           isUser
@@ -180,6 +196,7 @@ export function MessageRenderer({
             >
               {content}
             </Markdown>
+            {isStreaming && isAssistant && <StreamingCursor />}
           </div>
         ) : (
           // User messages: plain text

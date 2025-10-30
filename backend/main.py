@@ -5,6 +5,7 @@ Main application with chat agent integration
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.chat_router import router as chat_router
+from api.chat_streaming_router import router as chat_streaming_router
 from api.conversation_router import router as conversation_router
 # from api.chat_v2_router import router as chat_v2_router  # Disabled: Pydantic AI syntax issue
 # from api.chat_pydantic_router import router as chat_pydantic_router  # TODO: Enable when Pydantic AI 1.9.0 compatible
@@ -46,6 +47,9 @@ app.add_middleware(
 # Include routers
 # PRIMARY: Improved chat router with Claude 4.5 Sonnet + markdown support
 app.include_router(chat_router, prefix="/api")  # Main chat endpoint with Claude 4.5
+
+# NEW: Streaming chat router with SSE (Server-Sent Events)
+app.include_router(chat_streaming_router, prefix="/api", tags=["chat-streaming"])  # Streaming endpoint /api/chat/stream
 
 # SECONDARY: Conversation management
 app.include_router(conversation_router, prefix="/api")  # Conversation CRUD endpoints

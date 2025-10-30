@@ -1,20 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useChatStore, ChatMessage } from '../stores/chatStore'
 import { useImageStore } from '@/shared/stores/imageStore'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
 import { useImageConfig } from '@/shared/stores/imageConfigStore'
 import { useConversationStore } from '@/shared/stores/conversationStore'
+import { useStreamingChat } from '../hooks/useStreamingChat'
 import { backendFetch } from '@/shared/lib/portDetection'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
-import PromptsPanel from '@/components/ui/PromptsPanel'
 import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
 import ThinkingProcess from '@/components/ui/ThinkingProcess'
 import AgentPipeline, { PipelineStage } from '@/components/ui/AgentPipeline'
 import { MessageRenderer } from '@/components/ui/MessageRenderer'
-import { ChevronDown, ChevronUp, Copy, Check, Paperclip, Star, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, Check, Paperclip, Star, Trash2, MessageSquare, Folder, Brain, ArrowUp } from 'lucide-react'
 
 interface ReasoningStep {
   type: 'summary' | 'raw_text' | 'encrypted'
@@ -27,23 +27,34 @@ interface PastedImage {
   preview: string
 }
 
+// 🎛️ FEATURE FLAG: Toggle streaming on/off
+const ENABLE_STREAMING = process.env.NEXT_PUBLIC_ENABLE_STREAMING === 'true'
+
 export default function ChatAgent() {
   const [input, setInput] = useState('')
-  const [showPrompts, setShowPrompts] = useState(false)
   const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>([])
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [pastedImages, setPastedImages] = useState<PastedImage[]>([])
   const [viewMode, setViewMode] = useState<'agent' | 'conversations'>('agent') // Toggle between agent and conversations
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [thinkingEnabled, setThinkingEnabled] = useState(false) // 🧠 Extended thinking toggle
+  const messagesEndRef = useRef<HTMLDivElement>(null) // 📜 Auto-scroll ref
 
   const {
     messages,
     isLoading,
     addMessage,
     setLoading,
-    clearMessages
+    clearMessages,
+    isThinking,
+    thinkingStep,
+    thinkingMessage,
+    thinkingElapsed
   } = useChatStore()
+
+  // 🌊 Streaming chat hook (only used if ENABLE_STREAMING = true)
+  const { sendStreamingMessage, stopStreaming, isStreaming, currentStreamId } = useStreamingChat()
 
   const { setGeneratedImages, loadImagesFromDatabase } = useImageStore()
   const { selectedImages, clearSelection, handleImageSelect } = useSelectedImages()
@@ -80,6 +91,13 @@ export default function ChatAgent() {
       })
     }
   }, [])
+
+  // 📜 Auto-scroll to bottom when new messages arrive or streaming updates
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
+  }, [messages, isStreaming]) // Scroll on messages change or streaming state change
 
   const handleCopy = async (text: string, messageId: string) => {
     try {
@@ -127,14 +145,6 @@ export default function ChatAgent() {
     setPastedImages(prev => prev.filter(img => img.id !== id))
   }
 
-  const handleInjectPrompt = (prompt: string) => {
-    setInput(prev => {
-      const newInput = prev.trim() ? `${prev}\n\n${prompt}` : prompt
-      return newInput
-    })
-    setShowPrompts(false) // Collapse panel after injection
-  }
-
   // Conversation panel handlers
   const handleSelectConversation = async (id: string) => {
     try {
@@ -175,17 +185,45 @@ export default function ChatAgent() {
   })
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+    if (!input.trim() || (isLoading || isStreaming)) return
 
+    const trimmedInput = input.trim()
+    setInput('')
+
+    // 🌊 STREAMING MODE (if enabled via NEXT_PUBLIC_ENABLE_STREAMING=true)
+    if (ENABLE_STREAMING) {
+      try {
+        await sendStreamingMessage(trimmedInput, {
+          selectedImages: selectedImages,
+          pastedImages: pastedImages.map(img => img.base64),
+          userConfig: config,
+          enableThinking: thinkingEnabled
+        })
+
+        // Clear selections after send
+        clearSelection()
+        setPastedImages([])
+
+        // TODO: Implement auto-save for streaming mode
+        // Currently auto-save is handled via 'imagesUpdated' event in useStreamingChat
+        // but full auto-save logic (with routing to correct endpoint) needs to be added
+
+      } catch (error) {
+        console.error('Streaming failed:', error)
+        // TODO: Add toast notification for user
+      }
+      return // Exit early for streaming mode
+    }
+
+    // 📦 NON-STREAMING MODE (legacy, fallback)
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       role: 'user',
-      content: input.trim(),
+      content: trimmedInput,
       timestamp: new Date()
     }
 
     addMessage(userMessage)
-    setInput('')
     setLoading(true)
 
     try {
@@ -368,28 +406,30 @@ export default function ChatAgent() {
       {/* Header - Toggle between Agent and Conversations */}
       <GlassCard variant="dark" className="purple-glow mb-4">
         <div className="flex items-center gap-2">
-          {/* Agent View Button */}
+          {/* Agent View Button - Icon Only */}
           <LiquidButton
             onClick={() => setViewMode('agent')}
             variant="space"
             size="sm"
-            className={`flex-1 text-sm font-medium ${
+            className={`flex-1 ${
               viewMode === 'agent' ? 'ring-2 ring-purple-400' : ''
             }`}
+            title="Agent Chat"
           >
-            🤖 Agente
+            <MessageSquare className="w-4 h-4" />
           </LiquidButton>
 
-          {/* Conversations View Button */}
+          {/* Conversations View Button - Icon Only */}
           <LiquidButton
             onClick={() => setViewMode('conversations')}
             variant="space"
             size="sm"
-            className={`flex-1 text-sm font-medium ${
+            className={`flex-1 ${
               viewMode === 'conversations' ? 'ring-2 ring-purple-400' : ''
             }`}
+            title="All Conversations"
           >
-            📋 Ver Todas
+            <Folder className="w-4 h-4" />
           </LiquidButton>
         </div>
       </GlassCard>
@@ -402,7 +442,7 @@ export default function ChatAgent() {
             {messages.length === 0 ? (
               <GlassCard variant="purple" className="purple-glow">
                 <div className="text-center py-8">
-                  <div className="text-4xl mb-3">🤖</div>
+                  <MessageSquare className="w-16 h-16 mx-auto mb-3 text-purple-400" />
                   <p className="text-purple-100 font-medium">Hello! I'm your AI assistant</p>
                   <p className="text-purple-200 text-sm mt-2">
                     I can help you generate images, combine them, and manage your files.
@@ -419,6 +459,8 @@ export default function ChatAgent() {
                 role={message.role as 'user' | 'assistant'}
                 content={message.content}
                 timestamp={message.timestamp}
+                reasoning={message.reasoning}
+                isStreaming={isStreaming && message.id === currentStreamId}
                 onCopy={handleCopy}
                 copiedMessageId={copiedMessageId ?? undefined}
               />
@@ -442,19 +484,15 @@ export default function ChatAgent() {
           ))
         )}
 
+            {/* Auto-scroll anchor */}
+            <div ref={messagesEndRef} />
+
             {/* Agent Pipeline - Shows real-time processing stages */}
             <AgentPipeline
               stages={pipelineStages}
               isVisible={isLoading || pipelineStages.length > 0}
             />
           </div>
-
-          {/* Prompts Panel */}
-          {showPrompts && (
-            <div className="mb-4">
-              <PromptsPanel onInjectPrompt={handleInjectPrompt} />
-            </div>
-          )}
 
           {/* Input */}
           <GlassCard variant="dark" className="purple-glow">
@@ -519,28 +557,33 @@ export default function ChatAgent() {
                 placeholder="Ask me to generate images, combine them, or paste screenshots (Ctrl+V)..."
                 className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg backdrop-blur-sm text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition-all resize-none"
                 rows={3}
-                disabled={isLoading}
+                disabled={isLoading || isStreaming}
               />
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowPrompts(!showPrompts)}
-                    className="text-xs text-purple-300 hover:text-purple-200 transition-colors"
-                  >
-                    💡 {showPrompts ? 'Hide' : 'Show'} Prompts
-                  </button>
-                  <span className="text-xs text-purple-300 hidden sm:inline">
-                    • Press Enter to send, Shift+Enter for new line
-                  </span>
+                  {ENABLE_STREAMING && (
+                    <button
+                      onClick={() => setThinkingEnabled(!thinkingEnabled)}
+                      className={`p-2 transition-colors rounded-lg ${
+                        thinkingEnabled
+                          ? 'text-purple-200 bg-purple-500/20'
+                          : 'text-purple-400 hover:text-purple-300 hover:bg-purple-500/10'
+                      }`}
+                      title={thinkingEnabled ? 'Extended Thinking ON' : 'Extended Thinking OFF'}
+                    >
+                      <Brain className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
                 <LiquidButton
-                  onClick={handleSend}
-                  disabled={isLoading || !input.trim()}
-                  variant="space"
+                  onClick={isStreaming ? stopStreaming : handleSend}
+                  disabled={(isLoading || !input.trim()) && !isStreaming}
+                  variant={isStreaming ? "default" : "space"}
                   size="sm"
                   className="disabled:opacity-50"
+                  title={isStreaming ? 'Stop' : 'Send'}
                 >
-                  {isLoading ? '⏳' : '🚀'} <span className="hidden sm:inline">Send</span>
+                  <ArrowUp className="w-4 h-4" />
                 </LiquidButton>
               </div>
             </div>
