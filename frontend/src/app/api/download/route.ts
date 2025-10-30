@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import sharp from 'sharp'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -146,15 +147,23 @@ async function processImageDownload(webpUrl: string, prompt: string, imageId: st
       .replace(/\s+/g, '-')         // Replace spaces with dashes
       .substring(0, 30)             // Limit length
 
-    const filename = `dani-miniatura-${safePrompt}-${imageId.substring(0, 8)}.jpg`
+    const filename = `dani-miniatura-${safePrompt}-${imageId.substring(0, 8)}.png`
 
-    console.log(`✅ Serving download: ${filename}`)
+    console.log(`✅ Converting WebP → PNG and serving: ${filename}`)
 
-    // Return the image as JPG (even though it's WebP, browsers will handle it correctly)
-    // The key is setting the correct Content-Disposition header with .jpg extension
-    return new NextResponse(imageBuffer, {
+    // Convert WebP → PNG (lossless, better for design tools like Canva)
+    const pngBuffer = await sharp(Buffer.from(imageBuffer))
+      .png({
+        effort: 9,  // ZLIB compression level (0-10) for file size optimization
+        force: true  // Force PNG format
+      })
+      .toBuffer()
+
+    console.log(`📊 Original size: ${imageBuffer.byteLength} bytes, PNG size: ${pngBuffer.byteLength} bytes`)
+
+    return new NextResponse(new Uint8Array(pngBuffer), {
       headers: {
-        'Content-Type': 'image/jpeg',
+        'Content-Type': 'image/png',
         'Content-Disposition': `attachment; filename="${filename}"`,
         'Cache-Control': 'public, max-age=31536000, immutable',
       },

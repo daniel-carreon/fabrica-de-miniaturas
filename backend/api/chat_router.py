@@ -389,20 +389,23 @@ async def translate_to_english(text: str) -> str:
     return text
 
 async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
-    """Call OpenRouter API with robust error handling"""
+    """Call OpenRouter API with Claude Sonnet 4.5 - optimized for agentic reasoning & multimodal"""
     try:
-        logger.info(f"🚀 Calling OpenRouter with {len(messages)} messages")
+        logger.info(f"🚀 Calling OpenRouter with Claude Sonnet 4.5 ({len(messages)} messages)")
 
         async with httpx.AsyncClient() as client:
             payload = {
-                "model": "openai/gpt-4o",  # Using stable model instead of gpt-5
+                # 🎯 UPGRADED: Claude Sonnet 4.5 via OpenRouter
+                # - Frontier intelligence for complex tool calling
+                # - Multimodal (vision) support for image context
+                # - Optimized for real-world agents and coding workflows
+                "model": "anthropic/claude-sonnet-4.5",
                 "messages": messages,
                 "tools": TOOLS,
                 "tool_choice": "auto",
                 "max_tokens": 5000,  # Increased for long URL arrays
-                # ⚠️ REMOVED: "reasoning" field (not valid for gpt-4o, only for o1/o3)
-                "temperature": 0.3,  # Balanced for agentic decision-making (was 0.1)
-                "top_p": 0.95  # Increased from 0.5 to allow more model diversity in tool selection
+                "temperature": 0.7,  # Claude 4.5 optimal: 0.7 for balanced reasoning
+                "top_p": 0.95
             }
 
             logger.info(f"📤 OpenRouter payload: model={payload['model']}, messages={len(payload['messages'])}, tools={len(payload['tools'])}")

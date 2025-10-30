@@ -6,7 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.chat_router import router as chat_router
 from api.conversation_router import router as conversation_router
-from api.chat_v2_router import router as chat_v2_router
+# from api.chat_v2_router import router as chat_v2_router  # Disabled: Pydantic AI syntax issue
+# from api.chat_pydantic_router import router as chat_pydantic_router  # TODO: Enable when Pydantic AI 1.9.0 compatible
 import logging
 import os
 
@@ -43,9 +44,15 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(chat_router, prefix="/api")  # Original chat endpoint (OpenRouter)
-app.include_router(chat_v2_router, prefix="/api")  # New chat endpoint (Pydantic AI)
-app.include_router(conversation_router, prefix="/api")  # Conversation management endpoints
+# PRIMARY: Improved chat router with Claude 4.5 Sonnet + markdown support
+app.include_router(chat_router, prefix="/api")  # Main chat endpoint with Claude 4.5
+
+# SECONDARY: Conversation management
+app.include_router(conversation_router, prefix="/api")  # Conversation CRUD endpoints
+
+# DISABLED: See imports above for reasons
+# app.include_router(chat_v2_router, prefix="/api")  # Pydantic AI syntax issues
+# app.include_router(chat_pydantic_router, prefix="/api")  # TODO: Fix Pydantic AI 1.9.0 compatibility
 
 @app.get("/")
 async def root():

@@ -13,7 +13,8 @@ import PromptsPanel from '@/components/ui/PromptsPanel'
 import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
 import ThinkingProcess from '@/components/ui/ThinkingProcess'
 import AgentPipeline, { PipelineStage } from '@/components/ui/AgentPipeline'
-import { ChevronDown, ChevronUp, Copy, Check, Paperclip } from 'lucide-react'
+import { MessageRenderer } from '@/components/ui/MessageRenderer'
+import { ChevronDown, ChevronUp, Copy, Check, Paperclip, Star, Trash2 } from 'lucide-react'
 
 interface ReasoningStep {
   type: 'summary' | 'raw_text' | 'encrypted'
@@ -32,6 +33,10 @@ export default function ChatAgent() {
   const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>([])
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [pastedImages, setPastedImages] = useState<PastedImage[]>([])
+  const [viewMode, setViewMode] = useState<'agent' | 'conversations'>('agent') // Toggle between agent and conversations
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+
   const {
     messages,
     isLoading,
@@ -46,9 +51,17 @@ export default function ChatAgent() {
 
   // Conversation management
   const {
+    conversations,
     currentConversationId,
+    loading: conversationsLoading,
+    error: conversationsError,
     createConversation,
     setCurrentConversation,
+    loadConversations,
+    deleteConversation,
+    toggleFavorite,
+    updateConversationTitle,
+    clearError,
     addMessage: addConversationMessage,
     isPanelOpen,
     togglePanel
@@ -58,6 +71,7 @@ export default function ChatAgent() {
   // And initialize conversation if needed
   useEffect(() => {
     loadImagesFromDatabase()
+    loadConversations() // Load all conversations for the panel
 
     // Initialize conversation: create new if none exists
     if (!currentConversationId) {
@@ -120,6 +134,45 @@ export default function ChatAgent() {
     })
     setShowPrompts(false) // Collapse panel after injection
   }
+
+  // Conversation panel handlers
+  const handleSelectConversation = async (id: string) => {
+    try {
+      await setCurrentConversation(id)
+      setViewMode('agent') // Switch back to agent view after selecting
+    } catch (e) {
+      console.error('Failed to select conversation')
+    }
+  }
+
+  const handleStartEdit = (id: string, currentTitle: string) => {
+    setEditingId(id)
+    setEditTitle(currentTitle)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditTitle('')
+  }
+
+  const handleSaveTitle = async (id: string) => {
+    if (editTitle.trim()) {
+      try {
+        await updateConversationTitle(id, editTitle)
+        handleCancelEdit()
+      } catch (e) {
+        console.error('Failed to update title')
+      }
+    }
+  }
+
+  // Sort conversations: Favorites first, then recent
+  const sortedConversations = [...conversations].sort((a, b) => {
+    if (a.is_favorite !== b.is_favorite) {
+      return a.is_favorite ? -1 : 1
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -312,33 +365,28 @@ export default function ChatAgent() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header - Nueva Conversación + Ver Todas */}
+      {/* Header - Toggle between Agent and Conversations */}
       <GlassCard variant="dark" className="purple-glow mb-4">
         <div className="flex items-center gap-2">
-          {/* Nueva Conversación Button */}
+          {/* Agent View Button */}
           <LiquidButton
-            onClick={async () => {
-              try {
-                await createConversation()
-                console.log('✅ Nueva conversación creada')
-              } catch (e) {
-                console.error('❌ Failed to create conversation')
-              }
-            }}
-            variant="space"
-            size="sm"
-            className="flex-1 text-sm font-medium"
-          >
-            ➕ Nueva
-          </LiquidButton>
-
-          {/* Ver Todas Button - Toggles ConversationPanel */}
-          <LiquidButton
-            onClick={togglePanel}
+            onClick={() => setViewMode('agent')}
             variant="space"
             size="sm"
             className={`flex-1 text-sm font-medium ${
-              isPanelOpen ? 'ring-2 ring-purple-400' : ''
+              viewMode === 'agent' ? 'ring-2 ring-purple-400' : ''
+            }`}
+          >
+            🤖 Agente
+          </LiquidButton>
+
+          {/* Conversations View Button */}
+          <LiquidButton
+            onClick={() => setViewMode('conversations')}
+            variant="space"
+            size="sm"
+            className={`flex-1 text-sm font-medium ${
+              viewMode === 'conversations' ? 'ring-2 ring-purple-400' : ''
             }`}
           >
             📋 Ver Todas
@@ -346,51 +394,34 @@ export default function ChatAgent() {
         </div>
       </GlassCard>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto mb-4 space-y-3">
-        {messages.length === 0 ? (
-          <GlassCard variant="purple" className="purple-glow">
-            <div className="text-center py-8">
-              <div className="text-4xl mb-3">🤖</div>
-              <p className="text-purple-100 font-medium">Hello! I'm your AI assistant</p>
-              <p className="text-purple-200 text-sm mt-2">
-                I can help you generate images, combine them, and manage your files.
-                What would you like to do?
-              </p>
-            </div>
-          </GlassCard>
-        ) : (
+      {/* Conditional Content - Agent View or Conversations View */}
+      {viewMode === 'agent' ? (
+        <>
+          {/* AGENT VIEW - Original Chat Interface */}
+          <div className="flex-1 overflow-y-auto mb-4 space-y-3">
+            {messages.length === 0 ? (
+              <GlassCard variant="purple" className="purple-glow">
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-3">🤖</div>
+                  <p className="text-purple-100 font-medium">Hello! I'm your AI assistant</p>
+                  <p className="text-purple-200 text-sm mt-2">
+                    I can help you generate images, combine them, and manage your files.
+                    What would you like to do?
+                  </p>
+                </div>
+              </GlassCard>
+            ) : (
           messages.map((message) => (
             <div key={message.id} className="space-y-2">
-              <div
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] ${
-                    message.role === 'user'
-                      ? 'bg-purple-600/80 text-white rounded-l-lg rounded-tr-lg'
-                      : 'bg-black/60 text-purple-100 rounded-r-lg rounded-tl-lg border border-purple-500/30'
-                  } backdrop-blur-sm p-3 shadow-lg relative group`}
-                >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs opacity-60">
-                      {message.timestamp.toLocaleTimeString()}
-                    </span>
-                    <button
-                      onClick={() => handleCopy(message.content, message.id)}
-                      className="text-purple-300 hover:text-purple-100 transition-colors opacity-0 group-hover:opacity-100"
-                      title="Copy message"
-                    >
-                      {copiedMessageId === message.id ? (
-                        <Check size={14} />
-                      ) : (
-                        <Copy size={14} />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              {/* Message with Markdown Rendering */}
+              <MessageRenderer
+                id={message.id}
+                role={message.role as 'user' | 'assistant'}
+                content={message.content}
+                timestamp={message.timestamp}
+                onCopy={handleCopy}
+                copiedMessageId={copiedMessageId ?? undefined}
+              />
 
               {/* Thinking Process for AI messages */}
               {message.role === 'assistant' && (message.reasoning_details || message.tool_used || message.final_prompt) && (
@@ -411,110 +442,266 @@ export default function ChatAgent() {
           ))
         )}
 
-        {/* Agent Pipeline - Shows real-time processing stages */}
-        <AgentPipeline
-          stages={pipelineStages}
-          isVisible={isLoading || pipelineStages.length > 0}
-        />
-      </div>
-
-
-      {/* Prompts Panel */}
-      {showPrompts && (
-        <div className="mb-4">
-          <PromptsPanel onInjectPrompt={handleInjectPrompt} />
-        </div>
-      )}
-
-      {/* Input */}
-      <GlassCard variant="dark" className="purple-glow">
-        <div className="space-y-3">
-          {/* Selected Images - Minimalist */}
-          {selectedImages.length > 0 && (
-            <div className="bg-purple-600/20 border border-purple-500/30 rounded-lg p-2 backdrop-blur-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-purple-200 text-xs">{selectedImages.length}/8</span>
-                <div className="flex gap-1">
-                  {selectedImages.map((img) => (
-                    <div key={img.id} className="relative group">
-                      <div className="w-8 h-8 rounded border border-purple-400/50 overflow-hidden">
-                        <img src={img.url} alt="" className="w-full h-full object-cover" />
-                      </div>
-                      <button
-                        onClick={() => {
-                          // Use the context function to deselect
-                          handleImageSelect(img.id, img.url, img.source)
-                        }}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Pasted Images Preview */}
-          {pastedImages.length > 0 && (
-            <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg p-2 backdrop-blur-sm">
-              <div className="flex items-center gap-2">
-                <Paperclip size={14} className="text-blue-300" />
-                <span className="text-blue-200 text-xs">{pastedImages.length} pasted</span>
-                <div className="flex gap-1 flex-1">
-                  {pastedImages.map((img) => (
-                    <div key={img.id} className="relative group">
-                      <div className="w-12 h-12 rounded border border-blue-400/50 overflow-hidden">
-                        <img src={img.preview} alt="" className="w-full h-full object-cover" />
-                      </div>
-                      <button
-                        onClick={() => removePastedImage(img.id)}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            onPaste={handlePaste}
-            placeholder="Ask me to generate images, combine them, or paste screenshots (Ctrl+V)..."
-            className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg backdrop-blur-sm text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition-all resize-none"
-            rows={3}
-            disabled={isLoading}
-          />
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowPrompts(!showPrompts)}
-                className="text-xs text-purple-300 hover:text-purple-200 transition-colors"
-              >
-                💡 {showPrompts ? 'Hide' : 'Show'} Prompts
-              </button>
-              <span className="text-xs text-purple-300 hidden sm:inline">
-                • Press Enter to send, Shift+Enter for new line
-              </span>
-            </div>
-            <LiquidButton
-              onClick={handleSend}
-              disabled={isLoading || !input.trim()}
-              variant="space"
-              size="sm"
-              className="disabled:opacity-50"
-            >
-              {isLoading ? '⏳' : '🚀'} <span className="hidden sm:inline">Send</span>
-            </LiquidButton>
+            {/* Agent Pipeline - Shows real-time processing stages */}
+            <AgentPipeline
+              stages={pipelineStages}
+              isVisible={isLoading || pipelineStages.length > 0}
+            />
           </div>
-        </div>
-      </GlassCard>
+
+          {/* Prompts Panel */}
+          {showPrompts && (
+            <div className="mb-4">
+              <PromptsPanel onInjectPrompt={handleInjectPrompt} />
+            </div>
+          )}
+
+          {/* Input */}
+          <GlassCard variant="dark" className="purple-glow">
+            <div className="space-y-3">
+              {/* Selected Images - Minimalist */}
+              {selectedImages.length > 0 && (
+                <div className="bg-purple-600/20 border border-purple-500/30 rounded-lg p-2 backdrop-blur-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-purple-200 text-xs">{selectedImages.length}/8</span>
+                    <div className="flex gap-1">
+                      {selectedImages.map((img) => (
+                        <div key={img.id} className="relative group">
+                          <div className="w-8 h-8 rounded border border-purple-400/50 overflow-hidden">
+                            <img src={img.url} alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <button
+                            onClick={() => {
+                              // Use the context function to deselect
+                              handleImageSelect(img.id, img.url, img.source)
+                            }}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pasted Images Preview */}
+              {pastedImages.length > 0 && (
+                <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg p-2 backdrop-blur-sm">
+                  <div className="flex items-center gap-2">
+                    <Paperclip size={14} className="text-blue-300" />
+                    <span className="text-blue-200 text-xs">{pastedImages.length} pasted</span>
+                    <div className="flex gap-1 flex-1">
+                      {pastedImages.map((img) => (
+                        <div key={img.id} className="relative group">
+                          <div className="w-12 h-12 rounded border border-blue-400/50 overflow-hidden">
+                            <img src={img.preview} alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <button
+                            onClick={() => removePastedImage(img.id)}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                onPaste={handlePaste}
+                placeholder="Ask me to generate images, combine them, or paste screenshots (Ctrl+V)..."
+                className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg backdrop-blur-sm text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition-all resize-none"
+                rows={3}
+                disabled={isLoading}
+              />
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowPrompts(!showPrompts)}
+                    className="text-xs text-purple-300 hover:text-purple-200 transition-colors"
+                  >
+                    💡 {showPrompts ? 'Hide' : 'Show'} Prompts
+                  </button>
+                  <span className="text-xs text-purple-300 hidden sm:inline">
+                    • Press Enter to send, Shift+Enter for new line
+                  </span>
+                </div>
+                <LiquidButton
+                  onClick={handleSend}
+                  disabled={isLoading || !input.trim()}
+                  variant="space"
+                  size="sm"
+                  className="disabled:opacity-50"
+                >
+                  {isLoading ? '⏳' : '🚀'} <span className="hidden sm:inline">Send</span>
+                </LiquidButton>
+              </div>
+            </div>
+          </GlassCard>
+        </>
+      ) : (
+        <>
+          {/* CONVERSATIONS VIEW - List of all conversations */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Nueva Conversación Button */}
+            <div className="mb-4">
+              <LiquidButton
+                onClick={async () => {
+                  try {
+                    await createConversation()
+                    setViewMode('agent') // Switch to agent view after creating
+                    console.log('✅ Nueva conversación creada')
+                  } catch (e) {
+                    console.error('❌ Failed to create conversation')
+                  }
+                }}
+                variant="space"
+                size="sm"
+                className="w-full text-sm font-medium"
+              >
+                ➕ Nueva Conversación
+              </LiquidButton>
+            </div>
+
+            {/* Error Message */}
+            {conversationsError && (
+              <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-lg text-sm text-red-200 flex justify-between items-center backdrop-blur-sm">
+                <span>{conversationsError}</span>
+                <button
+                  onClick={clearError}
+                  className="text-red-300 hover:text-red-200 text-lg"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            {/* Conversations List */}
+            {conversationsLoading ? (
+              <GlassCard variant="dark" className="purple-glow">
+                <div className="text-center text-purple-300 py-8">
+                  <div className="animate-spin inline-block w-6 h-6 border-2 border-purple-600 border-t-purple-400 rounded-full" />
+                  <p className="mt-3 text-sm">Cargando conversaciones...</p>
+                </div>
+              </GlassCard>
+            ) : sortedConversations.length === 0 ? (
+              <GlassCard variant="dark" className="purple-glow">
+                <div className="text-center text-purple-300 py-8">
+                  <p className="text-sm">Sin conversaciones aún</p>
+                  <p className="text-xs mt-2 opacity-70">Crea una nueva para empezar</p>
+                </div>
+              </GlassCard>
+            ) : (
+              <div className="space-y-2">
+                {sortedConversations.map((conv) => (
+                  <GlassCard
+                    key={conv.id}
+                    variant={currentConversationId === conv.id ? 'purple' : 'dark'}
+                    className={`group cursor-pointer transition-all ${
+                      currentConversationId === conv.id
+                        ? 'purple-glow ring-2 ring-purple-400'
+                        : 'hover:purple-glow'
+                    }`}
+                  >
+                    {editingId === conv.id ? (
+                      // Edit mode
+                      <input
+                        autoFocus
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onBlur={() => handleSaveTitle(conv.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveTitle(conv.id)
+                          if (e.key === 'Escape') handleCancelEdit()
+                        }}
+                        className="w-full bg-black/50 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/30"
+                      />
+                    ) : (
+                      // View mode
+                      <div onClick={() => handleSelectConversation(conv.id)}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate text-purple-100 hover:text-white transition">
+                              {conv.title}
+                            </p>
+                            <p className="text-xs text-purple-300/70 mt-1">
+                              {new Date(conv.created_at).toLocaleDateString('es-ES', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </p>
+                          </div>
+                          {conv.is_favorite && (
+                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 flex-shrink-0" />
+                          )}
+                        </div>
+
+                        {/* Action Buttons - Show on hover */}
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity pt-3 mt-3 border-t border-purple-500/20">
+                          <LiquidButton
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleStartEdit(conv.id, conv.title)
+                            }}
+                            variant="space"
+                            size="sm"
+                            className="flex-1 text-xs"
+                          >
+                            Editar
+                          </LiquidButton>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleFavorite(conv.id)
+                            }}
+                            className="px-3 py-1 hover:bg-yellow-600/20 rounded-lg transition"
+                            title="Marcar como favorito"
+                          >
+                            <Star
+                              className={`w-4 h-4 ${
+                                conv.is_favorite ? 'fill-yellow-400 text-yellow-400' : 'text-purple-400'
+                              }`}
+                            />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (confirm('¿Eliminar esta conversación?')) {
+                                deleteConversation(conv.id)
+                              }
+                            }}
+                            className="px-3 py-1 hover:bg-red-600/20 rounded-lg transition"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-400" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </GlassCard>
+                ))}
+              </div>
+            )}
+
+            {/* Footer - Stats */}
+            <GlassCard variant="dark" className="mt-4 purple-glow">
+              <div className="text-xs text-purple-300 space-y-1">
+                <p>📊 {conversations.length} conversaciones</p>
+                <p>⭐ {conversations.filter((c) => c.is_favorite).length} favoritas</p>
+              </div>
+            </GlassCard>
+          </div>
+        </>
+      )}
     </div>
   )
 }
