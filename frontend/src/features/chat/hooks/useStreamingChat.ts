@@ -91,15 +91,62 @@ export function useStreamingChat() {
         updateToolExecution(event.tool_name, 100, 'complete')
         console.log('✅ Tool result:', event.result)
 
-        // If images generated, trigger gallery refresh
-        if (event.result?.images) {
-          window.dispatchEvent(new CustomEvent('imagesUpdated', {
-            detail: {
-              type: event.tool_name || 'generate',
-              count: event.result.images.length,
-              endpoint: 'tool_execution'
-            }
+        // 🚀 AUTO-SAVE: If images generated, save to Supabase and trigger gallery refresh
+        if (event.result?.images && Array.isArray(event.result.images)) {
+          const toolName = event.tool_name || 'unknown'
+          console.log(`💾 Auto-saving ${event.result.images.length} images from ${toolName}...`)
+
+          // Determine which endpoint to use based on tool
+          let saveEndpoint = '/api/created' // Default for create_images
+          if (toolName === 'generate_avatar') {
+            saveEndpoint = '/api/generated'
+          } else if (toolName === 'combine_images') {
+            saveEndpoint = '/api/combined'
+          }
+
+          // Prepare images data for save
+          const imagesToSave = event.result.images.map((img: any, idx: number) => ({
+            id: `${toolName}_${Date.now()}_${idx}`,
+            url: typeof img === 'string' ? img : (img.url || img),
+            prompt: event.tool_args?.prompt || 'Generated from chat',
+            timestamp: Date.now()
           }))
+
+          // Save to Supabase (async, don't wait)
+          fetch(saveEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              images: imagesToSave,
+              modelVersion: 'gemini-2.5-flash',
+              generationSession: `chat_${Date.now()}`,
+              toolUsed: toolName
+            })
+          })
+            .then(response => response.json())
+            .then(data => {
+              console.log(`✅ Auto-save complete: ${data.data?.saved || 0} images saved to ${saveEndpoint}`)
+
+              // NOW trigger gallery refresh after successful save
+              window.dispatchEvent(new CustomEvent('imagesUpdated', {
+                detail: {
+                  type: toolName,
+                  count: data.data?.saved || event.result.images.length,
+                  endpoint: saveEndpoint
+                }
+              }))
+            })
+            .catch(error => {
+              console.error('❌ Auto-save failed:', error)
+              // Still trigger refresh even if save fails (images might be in cache)
+              window.dispatchEvent(new CustomEvent('imagesUpdated', {
+                detail: {
+                  type: toolName,
+                  count: event.result.images.length,
+                  endpoint: 'tool_execution'
+                }
+              }))
+            })
         }
         break
 
