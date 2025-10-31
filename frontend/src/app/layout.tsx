@@ -1,6 +1,15 @@
 import './globals.css';
 import AppLayout from '@/components/layout/AppLayout';
 import PasswordGate from './password-gate';
+import { Roboto_Slab } from 'next/font/google';
+
+// 🎨 Configuración de fuentes - Roboto Slab para elegancia minimalista
+const robotoSlab = Roboto_Slab({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '900'], // 900 = Black
+  variable: '--font-roboto-slab',
+  display: 'swap',
+});
 
 export const metadata = {
   title: 'Fábrica de Miniaturas - AI Thumbnail Generator',
@@ -31,8 +40,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen" suppressHydrationWarning={true}>
+    <html lang="en" className={robotoSlab.variable}>
+      <body className={`min-h-screen ${robotoSlab.className}`} suppressHydrationWarning={true}>
         <PasswordGate>
           <AppLayout>
             {children}

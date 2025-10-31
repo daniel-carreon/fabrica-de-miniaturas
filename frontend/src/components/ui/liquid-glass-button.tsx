@@ -111,19 +111,20 @@ function LiquidButton({
         )}
         {...props}
       >
+        {/* Shadow minimalista elegante - apenas un toque morado */}
         <div className="absolute top-0 left-0 z-0 h-full w-full rounded-md
-            shadow-[0_0_6px_rgba(139,92,246,0.15),0_2px_6px_rgba(139,92,246,0.25),inset_3px_3px_0.5px_-3px_rgba(167,139,250,0.4),inset_-3px_-3px_0.5px_-3px_rgba(167,139,250,0.3),inset_1px_1px_1px_-0.5px_rgba(196,181,253,0.6),inset_-1px_-1px_1px_-0.5px_rgba(196,181,253,0.6),inset_0_0_6px_6px_rgba(139,92,246,0.12),inset_0_0_2px_2px_rgba(139,92,246,0.06),0_0_12px_rgba(139,92,246,0.3)]
-        transition-all
-        hover:shadow-[0_0_8px_rgba(139,92,246,0.25),0_2px_8px_rgba(139,92,246,0.35),inset_3px_3px_0.5px_-3.5px_rgba(167,139,250,0.5),inset_-3px_-3px_0.5px_-3.5px_rgba(167,139,250,0.4),inset_1px_1px_1px_-0.5px_rgba(196,181,253,0.7),inset_-1px_-1px_1px_-0.5px_rgba(196,181,253,0.7),inset_0_0_6px_6px_rgba(139,92,246,0.15),inset_0_0_2px_2px_rgba(139,92,246,0.08),0_0_20px_rgba(139,92,246,0.4)]" />
+            shadow-[0_4px_12px_rgba(0,0,0,0.4),0_0_8px_rgba(139,92,246,0.08),inset_1px_1px_1px_rgba(255,255,255,0.05)]
+        transition-all duration-300
+        hover:shadow-[0_6px_16px_rgba(0,0,0,0.5),0_0_12px_rgba(139,92,246,0.12),inset_1px_1px_1px_rgba(255,255,255,0.08)]" />
+
+        {/* Background sutil - negro con apenas un 5% morado */}
         <div
-          className="absolute top-0 left-0 isolate -z-10 h-full w-full overflow-hidden rounded-md bg-gradient-to-br from-purple-500/20 to-violet-600/30 backdrop-blur-sm"
-          style={{ backdropFilter: 'url("#container-glass")' }}
+          className="absolute top-0 left-0 isolate -z-10 h-full w-full overflow-hidden rounded-md bg-gradient-to-br from-neutral-900/95 via-neutral-900/90 to-purple-950/30 backdrop-blur-sm border border-neutral-700/20"
         />
 
-        <div className="pointer-events-none z-10 ">
+        <div className="pointer-events-none z-10 font-semibold">
           {children}
         </div>
-        <GlassFilter />
       </Comp>
     </>
   )

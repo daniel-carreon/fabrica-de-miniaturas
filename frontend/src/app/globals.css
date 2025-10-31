@@ -4,28 +4,30 @@
 
 @layer base {
   :root {
-    /* Negro profundo como base */
-    --background: 0 0% 4%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 7%;
+    /* 🎨 Negro sólido elegante - 90-95% negro puro */
+    --background: 0 0% 5%;        /* #0d0d0d - casi negro puro */
+    --foreground: 0 0% 98%;       /* #fafafa - blanco suave */
+    --card: 0 0% 8%;              /* #141414 - negro card sutil */
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 6%;
     --popover-foreground: 0 0% 98%;
-    /* Morado intenso */
-    --primary: 270 91% 65%;
+
+    /* 💜 Morado sutil - solo para acentos elegantes */
+    --primary: 270 60% 55%;       /* Morado menos saturado */
     --primary-foreground: 0 0% 100%;
-    --secondary: 270 50% 25%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 270 30% 15%;
-    --muted-foreground: 270 10% 70%;
-    --accent: 270 70% 50%;
+    --secondary: 0 0% 12%;        /* Gris oscuro sin morado */
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 10%;            /* Gris muy oscuro */
+    --muted-foreground: 0 0% 65%; /* Gris medio para texto secundario */
+    --accent: 270 50% 50%;        /* Morado elegante sutil */
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 85% 60%;
+
+    --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 270 40% 20%;
-    --input: 270 40% 15%;
-    --ring: 270 91% 65%;
-    --radius: 0.75rem;
+    --border: 0 0% 15%;           /* Bordes grises muy oscuros */
+    --input: 0 0% 12%;
+    --ring: 270 50% 50%;          /* Ring morado sutil */
+    --radius: 0.5rem;
   }
 
   * {
@@ -34,15 +36,8 @@
 
   body {
     @apply min-h-screen;
-    background: linear-gradient(135deg,
-      #0a0a0a 0%,
-      #1a0a2e 15%,
-      #0f0f0f 30%,
-      #1a0a2e 50%,
-      #0a0a0a 70%,
-      #16001e 85%,
-      #0a0a0a 100%
-    );
+    /* Negro sólido puro con apenas un 5% de toque morado */
+    background: #0a0a0a;
     color: hsl(var(--foreground));
     background-attachment: fixed;
   }
@@ -58,56 +53,54 @@
     max-width: 100%;
   }
 
-  /* Space-themed gradients */
+  /* Gradiente minimalista elegante - casi imperceptible */
   .space-gradient {
     background: linear-gradient(135deg,
-      rgb(15, 23, 42) 0%,
-      rgb(88, 28, 135) 25%,
-      rgb(109, 40, 217) 50%,
-      rgb(147, 51, 234) 75%,
-      rgb(30, 41, 59) 100%);
+      #0a0a0a 0%,
+      #101010 50%,
+      #0a0a0a 100%);
   }
 
+  /* Glow morado SUTIL - apenas visible */
   .purple-glow {
     box-shadow:
-      0 0 60px rgba(168, 85, 247, 0.4),
-      0 0 100px rgba(147, 51, 234, 0.2),
-      inset 0 0 30px rgba(168, 85, 247, 0.1);
-    border: 1px solid rgba(168, 85, 247, 0.3);
+      0 0 20px rgba(168, 85, 247, 0.08),
+      0 0 40px rgba(147, 51, 234, 0.04);
+    border: 1px solid rgba(168, 85, 247, 0.12);
   }
 
-  /* Custom slider styles for configuration panel */
+  /* Slider minimalista con toque morado sutil */
   .slider {
-    background: linear-gradient(to right, rgba(147, 51, 234, 0.3), rgba(147, 51, 234, 0.8));
+    background: rgba(40, 40, 40, 0.5);
     outline: none;
     border-radius: 0.5rem;
   }
 
   .slider::-webkit-slider-thumb {
     appearance: none;
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
-    background: linear-gradient(135deg, rgb(147, 51, 234), rgb(168, 85, 247));
+    background: linear-gradient(135deg, #8b5cf6, #a78bfa);
     cursor: pointer;
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
     transition: all 0.2s ease;
   }
 
   .slider::-webkit-slider-thumb:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(147, 51, 234, 0.4);
+    transform: scale(1.08);
+    box-shadow: 0 3px 12px rgba(139, 92, 246, 0.3);
   }
 
   .slider::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
-    background: linear-gradient(135deg, rgb(147, 51, 234), rgb(168, 85, 247));
+    background: linear-gradient(135deg, #8b5cf6, #a78bfa);
     cursor: pointer;
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
   }
 
   /* Shimmer animation for image loading */
@@ -137,10 +130,10 @@
     }
   }
 
-  /* Smooth scrolling for mobile overflow */
+  /* Scrollbar minimalista elegante */
   .mobile-scroll {
     scrollbar-width: thin;
-    scrollbar-color: rgba(147, 51, 234, 0.3) rgba(255, 255, 255, 0.1);
+    scrollbar-color: rgba(139, 92, 246, 0.2) rgba(30, 30, 30, 0.3);
   }
 
   .mobile-scroll::-webkit-scrollbar {
@@ -148,23 +141,23 @@
   }
 
   .mobile-scroll::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(30, 30, 30, 0.3);
     border-radius: 3px;
   }
 
   .mobile-scroll::-webkit-scrollbar-thumb {
-    background: rgba(147, 51, 234, 0.5);
+    background: rgba(139, 92, 246, 0.3);
     border-radius: 3px;
   }
 
   .mobile-scroll::-webkit-scrollbar-thumb:hover {
-    background: rgba(147, 51, 234, 0.7);
+    background: rgba(139, 92, 246, 0.5);
   }
 
-  /* Custom scrollbar for modals and panels */
+  /* Custom scrollbar sutil para modals */
   .custom-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(168, 85, 247, 0.5) rgba(0, 0, 0, 0.2);
+    scrollbar-color: rgba(139, 92, 246, 0.25) rgba(20, 20, 20, 0.4);
   }
 
   .custom-scrollbar::-webkit-scrollbar {
@@ -172,24 +165,20 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(20, 20, 20, 0.4);
     border-radius: 4px;
     margin: 4px 0;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg,
-      rgba(168, 85, 247, 0.6) 0%,
-      rgba(147, 51, 234, 0.8) 100%);
+    background: rgba(139, 92, 246, 0.3);
     border-radius: 4px;
-    border: 2px solid rgba(0, 0, 0, 0.2);
+    border: 2px solid rgba(20, 20, 20, 0.4);
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg,
-      rgba(168, 85, 247, 0.8) 0%,
-      rgba(147, 51, 234, 1) 100%);
-    box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+    background: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 0 6px rgba(139, 92, 246, 0.2);
   }
 }
 
@@ -245,29 +234,28 @@
 
   .image-card {
     @apply relative overflow-hidden rounded-lg border backdrop-blur-sm shadow-lg transition-all hover:shadow-xl cursor-pointer;
-    background: rgba(10, 10, 10, 0.7);
-    border: 1px solid rgba(168, 85, 247, 0.2);
-    box-shadow: 0 0 25px rgba(168, 85, 247, 0.15);
+    background: rgba(18, 18, 18, 0.9);
+    border: 1px solid rgba(60, 60, 60, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 
   .image-card:hover {
-    background: rgba(15, 15, 15, 0.8);
-    border-color: rgba(168, 85, 247, 0.5);
+    background: rgba(22, 22, 22, 0.95);
+    border-color: rgba(139, 92, 246, 0.3);
     box-shadow:
-      0 0 40px rgba(168, 85, 247, 0.3),
-      0 0 60px rgba(147, 51, 234, 0.15);
+      0 6px 20px rgba(0, 0, 0, 0.4),
+      0 0 15px rgba(139, 92, 246, 0.08);
     transform: translateY(-2px);
   }
 
   .image-card.selected {
     @apply ring-2 ring-offset-2;
-    background: rgba(20, 10, 30, 0.9);
-    border-color: rgba(168, 85, 247, 0.9);
-    ring-color: rgba(168, 85, 247, 0.8);
+    background: rgba(25, 20, 30, 0.95);
+    border-color: rgba(139, 92, 246, 0.6);
+    ring-color: rgba(139, 92, 246, 0.5);
     ring-offset-color: #0a0a0a;
     box-shadow:
-      0 0 50px rgba(168, 85, 247, 0.5),
-      0 0 80px rgba(147, 51, 234, 0.3),
-      inset 0 0 30px rgba(168, 85, 247, 0.1);
+      0 8px 24px rgba(0, 0, 0, 0.5),
+      0 0 20px rgba(139, 92, 246, 0.15);
   }
 }

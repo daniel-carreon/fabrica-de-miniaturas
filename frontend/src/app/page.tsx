@@ -682,21 +682,21 @@ export default function HomePage() {
             <div className="flex items-center gap-4">
               <h2 className="text-xl font-bold text-white">🚀 Media Dashboard</h2>
 
-              {/* Simple Toggle Button */}
-              <button
-                onClick={() => {
-                  setCombineMode(!combineMode)
-                  // ✅ Keep selection when switching modes - better UX
-                  // User can select images and toggle between combine/delete without losing selection
-                }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border-2 flex items-center gap-2 shadow-lg ${
-                  combineMode
-                    ? 'bg-purple-600 border-purple-500 text-white hover:bg-purple-700 hover:shadow-purple-500/30'
-                    : 'bg-gray-800 border-gray-600 text-gray-400 opacity-50'
-                }`}
-              >
-                🔄 Combine
-              </button>
+              {/* Combine Toggle - Only show when images are selected */}
+              {selectedImages.length > 0 && (
+                <button
+                  onClick={() => {
+                    setCombineMode(!combineMode)
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border-2 flex items-center gap-2 shadow-lg ${
+                    combineMode
+                      ? 'bg-purple-600 border-purple-500 text-white hover:bg-purple-700 hover:shadow-purple-500/30'
+                      : 'bg-gray-800 border-gray-600 text-gray-400 opacity-50'
+                  }`}
+                >
+                  🔄 Combine
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-3">
               {selectedImages.length > 0 && (
