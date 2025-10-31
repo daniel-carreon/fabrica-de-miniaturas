@@ -434,7 +434,7 @@ async def event_generator(request: ChatRequest) -> AsyncGenerator[str, None]:
 
         yield sse_event('complete', {
             'final_response': full_response,
-            'tool_used': tool_use_blocks[0].name if tool_use_blocks else None,
+            'tool_used': tool_use_blocks[0]['name'] if tool_use_blocks else None,
             'usage': {
                 'input_tokens': final_message.usage.input_tokens,
                 'output_tokens': final_message.usage.output_tokens
