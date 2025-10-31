@@ -14,13 +14,26 @@ export interface ChatMessage {
   prompt_length?: number
 }
 
+// Agent Phase State Machine - Tracks current execution phase
+export type AgentPhase =
+  | { type: 'idle' }
+  | { type: 'thinking', step: string, message: string, elapsed: number }
+  | { type: 'executing_tool', toolName: string, toolId: string, progress: number, status: 'starting' | 'running' | 'complete' | 'error' }
+  | { type: 'responding', textAccumulated: string }
+
 interface ChatStore {
   // Chat state
   messages: ChatMessage[]
   isLoading: boolean
   error: string | null
 
-  // Streaming state
+  // Model selection
+  selectedModel: 'sonnet' | 'haiku'
+
+  // Agent Phase State Machine (NEW)
+  agentPhase: AgentPhase
+
+  // Streaming state (legacy - kept for backward compatibility)
   isThinking: boolean
   thinkingStep: string
   thinkingMessage: string
@@ -37,13 +50,19 @@ interface ChatStore {
   addMessage: (message: ChatMessage) => void
   updateLastMessage: (content: string) => void
   appendToLastMessage: (messageId: string, chunk: string) => void
-  appendReasoningToMessage: (messageId: string, reasoningChunk: string) => void  // NEW: Accumulate reasoning
-  updateMessageStreaming: (messageId: string, isStreaming: boolean) => void  // NEW: Update streaming status
+  appendReasoningToMessage: (messageId: string, reasoningChunk: string) => void  // Accumulate reasoning
+  updateMessageStreaming: (messageId: string, isStreaming: boolean) => void  // Update streaming status
   setLoading: (isLoading: boolean) => void
   setError: (error: string | null) => void
   clearMessages: () => void
 
-  // Streaming methods
+  // Model management
+  setSelectedModel: (model: 'sonnet' | 'haiku') => void
+
+  // Agent Phase Management (NEW)
+  setAgentPhase: (phase: AgentPhase) => void
+
+  // Streaming methods (legacy)
   setThinking: (step: string | null, message?: string, elapsed?: number) => void
   updateToolExecution: (toolName: string | null, progress?: number, status?: 'idle' | 'running' | 'complete' | 'error') => void
 
@@ -63,7 +82,13 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       error: null,
       availableTools: [],
 
-      // Streaming state
+      // Model selection (default to Sonnet)
+      selectedModel: 'sonnet',
+
+      // Agent Phase State Machine (NEW)
+      agentPhase: { type: 'idle' },
+
+      // Streaming state (legacy)
       isThinking: false,
       thinkingStep: '',
       thinkingMessage: '',
@@ -123,7 +148,46 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         error: null
       }),
 
-      // Streaming methods
+      // Model management
+      setSelectedModel: (model) => set({ selectedModel: model }),
+
+      // Agent Phase Management (NEW)
+      setAgentPhase: (phase) => {
+        set({ agentPhase: phase })
+
+        // Update legacy state for backward compatibility
+        if (phase.type === 'thinking') {
+          set({
+            isThinking: true,
+            thinkingStep: phase.step,
+            thinkingMessage: phase.message,
+            thinkingElapsed: phase.elapsed
+          })
+        } else if (phase.type === 'executing_tool') {
+          set({
+            isThinking: false,
+            activeToolName: phase.toolName,
+            toolProgress: phase.progress,
+            toolStatus: phase.status
+          })
+        } else if (phase.type === 'responding') {
+          set({
+            isThinking: false,
+            activeToolName: null,
+            toolProgress: 0,
+            toolStatus: 'idle'
+          })
+        } else if (phase.type === 'idle') {
+          set({
+            isThinking: false,
+            activeToolName: null,
+            toolProgress: 0,
+            toolStatus: 'idle'
+          })
+        }
+      },
+
+      // Streaming methods (legacy - kept for backward compatibility)
       setThinking: (step, message = '', elapsed = 0) => set({
         isThinking: !!step,
         thinkingStep: step || '',

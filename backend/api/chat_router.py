@@ -6,7 +6,7 @@ import json
 import logging
 import time
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, validator
 from typing import Literal
@@ -65,14 +65,24 @@ class UserImageConfig(BaseModel):
             raise ValueError('Temperature must be between 0.1 and 1.0')
         return v
 
+class PastedImage(BaseModel):
+    """Pasted image from clipboard with MIME type information"""
+    base64: str  # Full data URI (data:image/png;base64,...)
+    mimeType: str  # e.g., 'image/png', 'image/jpeg', 'image/webp'
+    size: Optional[int] = None  # File size in bytes
+
 class ChatRequest(BaseModel):
     message: str
     messages: List[ChatMessage] = []
     selectedImages: List[SelectedImage] = []
-    pastedImages: List[str] = []  # Base64 encoded images from clipboard
+    pastedImages: List[Union[str, PastedImage]] = []  # Accept both string and object for backward compatibility
     userConfig: Optional[UserImageConfig] = Field(
         default=None,
         description="User configuration for image generation parameters"
+    )
+    model: Optional[Literal['sonnet', 'haiku']] = Field(
+        default='sonnet',
+        description="Anthropic model to use: 'sonnet' (Claude Sonnet 4.5) or 'haiku' (Claude Haiku 4.5)"
     )
 
 class PipelineStage(BaseModel):
@@ -388,18 +398,27 @@ async def translate_to_english(text: str) -> str:
 
     return text
 
-async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
-    """Call OpenRouter API with Claude Sonnet 4.5 - optimized for agentic reasoning & multimodal"""
+async def call_openrouter(messages: List[Dict[str, str]], model: str = 'sonnet') -> Dict[str, Any]:
+    """Call OpenRouter API with Claude models - optimized for agentic reasoning & multimodal"""
+
+    # Map frontend model names to OpenRouter API model IDs
+    model_map = {
+        'sonnet': 'anthropic/claude-sonnet-4-5-20250929',
+        'haiku': 'anthropic/claude-haiku-4-5-20251001'
+    }
+
+    model_id = model_map.get(model, model_map['sonnet'])
+    model_name = 'Claude Sonnet 4.5' if model == 'sonnet' else 'Claude Haiku 4.5'
+
     try:
-        logger.info(f"🚀 Calling OpenRouter with Claude Sonnet 4.5 ({len(messages)} messages)")
+        logger.info(f"🚀 Calling OpenRouter with {model_name} ({len(messages)} messages)")
 
         async with httpx.AsyncClient() as client:
             payload = {
-                # 🎯 UPGRADED: Claude Sonnet 4.5 via OpenRouter
-                # - Frontier intelligence for complex tool calling
-                # - Multimodal (vision) support for image context
-                # - Optimized for real-world agents and coding workflows
-                "model": "anthropic/claude-sonnet-4.5",
+                # Dynamic model selection based on user preference
+                # Sonnet 4.5: Frontier intelligence for complex tool calling
+                # Haiku 4.5: Fast & economical for simple tasks
+                "model": model_id,
                 "messages": messages,
                 "tools": TOOLS,
                 "tool_choice": "auto",
@@ -1054,8 +1073,8 @@ async def chat_endpoint(request: ChatRequest):
         else:
             logger.warning(f"⚠️ NO SELECTED IMAGES CONTEXT IN SYSTEM PROMPT - This is the problem!")
 
-        # Call OpenRouter
-        data = await call_openrouter(messages)
+        # Call OpenRouter with selected model
+        data = await call_openrouter(messages, request.model)
         choice = data.get("choices", [{}])[0]
 
         # Complete Stage 2

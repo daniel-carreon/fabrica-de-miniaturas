@@ -4,13 +4,21 @@ import { useConversationStore } from '@/stores/conversationStore'
 import type { ChatMessage } from '../stores/chatStore'
 
 interface StreamEvent {
-  type: 'start' | 'thinking' | 'thinking_start' | 'thinking_delta' | 'thinking_complete' | 'text_delta' | 'tool_call_start' | 'tool_executing' | 'tool_call_result' | 'complete' | 'error'
+  type: 'start' | 'thinking' | 'thinking_start' | 'thinking_delta' | 'thinking_complete' | 'text_delta' |
+        'tool_call_start' | 'tool_executing' | 'tool_call_result' | 'complete' | 'error' |
+        'phase_change' | 'tool_calls_detected'  // NEW: Phase-based events
   [key: string]: any
+}
+
+interface PastedImageData {
+  base64: string
+  mimeType: string
+  size: number
 }
 
 interface SendMessageOptions {
   selectedImages?: any[]
-  pastedImages?: string[]
+  pastedImages?: PastedImageData[]
   userConfig?: any
   enableThinking?: boolean
 }
@@ -85,20 +93,68 @@ export function useStreamingChat() {
 
         // If images generated, trigger gallery refresh
         if (event.result?.images) {
-          window.dispatchEvent(new CustomEvent('imagesUpdated'))
+          window.dispatchEvent(new CustomEvent('imagesUpdated', {
+            detail: {
+              type: event.tool_name || 'generate',
+              count: event.result.images.length,
+              endpoint: 'tool_execution'
+            }
+          }))
         }
+        break
+
+      case 'phase_change':
+        // NEW: Phase-based architecture - update agent phase
+        console.log(`🔄 Phase change: ${event.from_phase} → ${event.to_phase}`)
+
+        const { setAgentPhase } = useChatStore.getState()
+
+        if (event.to_phase === 'thinking') {
+          setAgentPhase({
+            type: 'thinking',
+            step: 'analyzing',
+            message: 'Claude is analyzing...',
+            elapsed: event.elapsed_ms || 0
+          })
+        } else if (event.to_phase === 'executing_tool') {
+          setAgentPhase({
+            type: 'executing_tool',
+            toolName: event.tool_name || 'unknown',
+            toolId: event.tool_id || '',
+            progress: 0,
+            status: 'starting'
+          })
+        } else if (event.to_phase === 'responding') {
+          setAgentPhase({
+            type: 'responding',
+            textAccumulated: ''
+          })
+        } else if (event.to_phase === 'idle') {
+          setAgentPhase({ type: 'idle' })
+        }
+        break
+
+      case 'tool_calls_detected':
+        // NEW: Multiple tools detected - log for debugging
+        console.log(`🔧 Tools detected: ${event.count} tools - ${event.tools.map((t: any) => t.name).join(', ')}`)
         break
 
       case 'complete':
         console.log('✨ Stream complete:', event)
         setThinking(null)
         updateToolExecution(null)
+        // Set phase to idle
+        const { setAgentPhase: setPhaseComplete } = useChatStore.getState()
+        setPhaseComplete({ type: 'idle' })
         break
 
       case 'error':
         console.error('❌ Stream error:', event.error)
         setThinking(null)
         updateToolExecution(null)
+        // Set phase to idle on error
+        const { setAgentPhase: setPhaseError } = useChatStore.getState()
+        setPhaseError({ type: 'idle' })
         // Error is already shown in chat via appendToLastMessage
         break
 
@@ -150,7 +206,8 @@ export function useStreamingChat() {
         selectedImages: options?.selectedImages || [],
         pastedImages: options?.pastedImages || [],
         userConfig: options?.userConfig,
-        enable_thinking: options?.enableThinking || false
+        enable_thinking: options?.enableThinking || false,
+        model: useChatStore.getState().selectedModel // Pass selected model to backend
       }
 
       console.log('🧠 Extended Thinking Request:', {

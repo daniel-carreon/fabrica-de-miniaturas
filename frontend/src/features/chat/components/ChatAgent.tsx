@@ -14,6 +14,7 @@ import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
 import ThinkingProcess from '@/components/ui/ThinkingProcess'
 import AgentPipeline, { PipelineStage } from '@/components/ui/AgentPipeline'
 import { MessageRenderer } from '@/components/ui/MessageRenderer'
+import { ModelSelector } from '@/components/ui/ModelSelector'
 import { ChevronDown, ChevronUp, Copy, Check, Paperclip, Star, Trash2, MessageSquare, Folder, Brain, ArrowUp } from 'lucide-react'
 
 interface ReasoningStep {
@@ -25,6 +26,8 @@ interface PastedImage {
   id: string
   base64: string
   preview: string
+  mimeType: string  // 'image/png', 'image/jpeg', 'image/gif', 'image/webp'
+  size: number      // File size in bytes
 }
 
 // 🎛️ FEATURE FLAG: Toggle streaming on/off
@@ -38,7 +41,7 @@ export default function ChatAgent() {
   const [viewMode, setViewMode] = useState<'agent' | 'conversations'>('agent') // Toggle between agent and conversations
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
-  const [thinkingEnabled, setThinkingEnabled] = useState(false) // 🧠 Extended thinking toggle
+  const [thinkingEnabled, setThinkingEnabled] = useState(true) // 🧠 Extended thinking toggle (DEFAULT ON)
   const messagesEndRef = useRef<HTMLDivElement>(null) // 📜 Auto-scroll ref
 
   const {
@@ -50,7 +53,13 @@ export default function ChatAgent() {
     isThinking,
     thinkingStep,
     thinkingMessage,
-    thinkingElapsed
+    thinkingElapsed,
+    activeToolName,
+    toolProgress,
+    toolStatus,
+    selectedModel,
+    setSelectedModel,
+    agentPhase
   } = useChatStore()
 
   // 🌊 Streaming chat hook (only used if ENABLE_STREAMING = true)
@@ -127,14 +136,39 @@ export default function ChatAgent() {
         const reader = new FileReader()
         reader.onloadend = () => {
           const base64String = reader.result as string
+
+          // Extract MIME type from data URI (data:image/png;base64,...)
+          const mimeTypeMatch = base64String.match(/^data:(image\/\w+);base64,/)
+          const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/png' // Default to PNG
+
+          // Calculate approximate size in bytes
+          const base64Data = base64String.split(',')[1] || ''
+          const size = Math.round((base64Data.length * 3) / 4)
+
+          // Validate format
+          const supportedFormats = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
+          if (!supportedFormats.includes(mimeType)) {
+            console.warn(`⚠️ Unsupported image format: ${mimeType}`)
+            return
+          }
+
+          // Validate size (max 5MB)
+          const maxSize = 5 * 1024 * 1024
+          if (size > maxSize) {
+            console.error(`❌ Image too large: ${(size / 1024 / 1024).toFixed(2)}MB (max 5MB)`)
+            return
+          }
+
           const pastedImage: PastedImage = {
             id: `pasted_${Date.now()}_${i}`,
             base64: base64String,
-            preview: base64String // Use same for preview
+            preview: base64String,
+            mimeType: mimeType,
+            size: size
           }
 
           setPastedImages(prev => [...prev, pastedImage])
-          console.log('📸 Image pasted:', pastedImage.id)
+          console.log(`📸 Image pasted: ${pastedImage.id}, type: ${mimeType}, size: ${(size / 1024).toFixed(1)}KB`)
         }
         reader.readAsDataURL(blob)
       }
@@ -195,7 +229,11 @@ export default function ChatAgent() {
       try {
         await sendStreamingMessage(trimmedInput, {
           selectedImages: selectedImages,
-          pastedImages: pastedImages.map(img => img.base64),
+          pastedImages: pastedImages.map(img => ({
+            base64: img.base64,
+            mimeType: img.mimeType,
+            size: img.size
+          })),
           userConfig: config,
           enableThinking: thinkingEnabled
         })
@@ -237,7 +275,11 @@ export default function ChatAgent() {
           messages: messages, // Context history
           selectedImages: selectedImages, // Include selected images for combination tool
           userConfig: config, // Include user configuration for enhanced prompts
-          pastedImages: pastedImages.map(img => img.base64) // Include pasted images for vision
+          pastedImages: pastedImages.map(img => ({
+            base64: img.base64,
+            mimeType: img.mimeType,
+            size: img.size
+          })) // Include pasted images for vision with MIME type
         }),
       })
 
@@ -484,6 +526,20 @@ export default function ChatAgent() {
           ))
         )}
 
+            {/* Minimal Typing Indicator - Shows agent status */}
+            {(isStreaming || agentPhase.type !== 'idle') && (
+              <div className="flex justify-start mb-4">
+                <div className="bg-gray-800/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-gray-700/50">
+                  <span className="text-sm text-gray-300 animate-blink">
+                    {agentPhase.type === 'thinking' && 'Pensando...'}
+                    {agentPhase.type === 'executing_tool' && activeToolName && `Ejecutando: ${activeToolName}...`}
+                    {agentPhase.type === 'responding' && 'Generando respuesta...'}
+                    {isStreaming && agentPhase.type === 'idle' && 'Escribiendo...'}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Auto-scroll anchor */}
             <div ref={messagesEndRef} />
 
@@ -562,17 +618,23 @@ export default function ChatAgent() {
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   {ENABLE_STREAMING && (
-                    <button
-                      onClick={() => setThinkingEnabled(!thinkingEnabled)}
-                      className={`p-2 transition-colors rounded-lg ${
-                        thinkingEnabled
-                          ? 'text-purple-200 bg-purple-500/20'
-                          : 'text-purple-400 hover:text-purple-300 hover:bg-purple-500/10'
-                      }`}
-                      title={thinkingEnabled ? 'Extended Thinking ON' : 'Extended Thinking OFF'}
-                    >
-                      <Brain className="w-4 h-4" />
-                    </button>
+                    <>
+                      <button
+                        onClick={() => setThinkingEnabled(!thinkingEnabled)}
+                        className={`p-2 transition-colors rounded-lg ${
+                          thinkingEnabled
+                            ? 'text-purple-200 bg-purple-500/20'
+                            : 'text-purple-400 hover:text-purple-300 hover:bg-purple-500/10'
+                        }`}
+                        title={thinkingEnabled ? 'Extended Thinking ON' : 'Extended Thinking OFF'}
+                      >
+                        <Brain className="w-4 h-4" />
+                      </button>
+                      <ModelSelector
+                        selectedModel={selectedModel}
+                        onModelChange={setSelectedModel}
+                      />
+                    </>
                   )}
                 </div>
                 <LiquidButton
@@ -745,6 +807,7 @@ export default function ChatAgent() {
           </div>
         </>
       )}
+
     </div>
   )
 }
