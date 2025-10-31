@@ -41,7 +41,7 @@ interface ChatStore {
 
   activeToolName: string | null
   toolProgress: number
-  toolStatus: 'idle' | 'running' | 'complete' | 'error'
+  toolStatus: 'idle' | 'running' | 'starting' | 'complete' | 'error'
 
   // Agent capabilities
   availableTools: string[]

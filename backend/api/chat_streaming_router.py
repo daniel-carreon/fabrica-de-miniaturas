@@ -564,8 +564,31 @@ async def event_generator(request: ChatRequest) -> AsyncGenerator[str, None]:
                 "content": tool_results_content
             }
 
-            # Construct Turn 2 conversation
-            messages_turn2 = messages + [assistant_tool_message, user_tool_results_message]
+            # 🚨 CRITICAL FIX: Clean base64 images from messages history before Turn 2 to prevent token overflow
+            # Messages may contain base64 images from previous turns (50k-100k tokens each)
+            clean_messages = []
+            for msg in messages:
+                if isinstance(msg.get('content'), list):
+                    # Filter out base64 image content blocks
+                    clean_content = []
+                    for block in msg['content']:
+                        if block.get('type') == 'image':
+                            img_source = block.get('source', {})
+                            img_url = img_source.get('url', '')
+                            if img_url.startswith('data:'):
+                                logger.warning(f"⚠️ Turn 2: Skipping base64 image from message history (token overflow prevention)")
+                                continue  # Skip base64 images
+                        clean_content.append(block)
+                    clean_messages.append({
+                        "role": msg['role'],
+                        "content": clean_content
+                    })
+                else:
+                    # Text-only message, keep as is
+                    clean_messages.append(msg)
+
+            # Construct Turn 2 conversation with cleaned messages
+            messages_turn2 = clean_messages + [assistant_tool_message, user_tool_results_message]
 
             # Send phase change to responding
             yield sse_event('phase_change', {

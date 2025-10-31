@@ -45,7 +45,7 @@ export function ModelSelector({ selectedModel, onModelChange, className = '' }: 
           <button
             key={model.id}
             onClick={() => onModelChange(model.id)}
-            className={`p-2 transition-colors rounded-lg ${colorClasses[model.color]}`}
+            className={`p-2 transition-colors rounded-lg ${colorClasses[model.color as keyof typeof colorClasses]}`}
             title={model.tooltip}
             aria-label={`Switch to ${model.label}`}
           >
