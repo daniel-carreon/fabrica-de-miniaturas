@@ -12,6 +12,8 @@ import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
 import PromptsPanel from '@/components/ui/PromptsPanel'
 import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
+import ModelSelector from '@/components/ui/ModelSelector'
+import ThinkingDisplay from '@/components/ui/ThinkingDisplay'
 import ThinkingProcess from '@/components/ui/ThinkingProcess'
 import AgentPipeline, { PipelineStage } from '@/components/ui/AgentPipeline'
 import { MessageRenderer } from '@/components/ui/MessageRenderer'
@@ -37,6 +39,7 @@ export default function ChatAgent() {
   const [viewMode, setViewMode] = useState<'agent' | 'conversations'>('agent') // Toggle between agent and conversations
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [lastThinking, setLastThinking] = useState<string | null>(null) // Store latest thinking process
 
   const {
     messages,
@@ -327,6 +330,13 @@ export default function ChatAgent() {
         }
       }
 
+      // Extract thinking content from response for display
+      if (data.reasoning_details && typeof data.reasoning_details === 'string') {
+        setLastThinking(data.reasoning_details)
+      } else if (data.reasoning_details && typeof data.reasoning_details === 'object' && data.reasoning_details.content) {
+        setLastThinking(data.reasoning_details.content)
+      }
+
       const assistantMessage: ChatMessage = {
         id: `msg_${Date.now()}_assistant`,
         role: 'assistant',
@@ -463,6 +473,9 @@ export default function ChatAgent() {
           {/* Input */}
           <GlassCard variant="dark" className="purple-glow">
             <div className="space-y-3">
+              {/* Thinking Display - Minimalista Toggle */}
+              <ThinkingDisplay thinking={lastThinking} isLoading={isLoading} />
+
               {/* Selected Images - Minimalist */}
               {selectedImages.length > 0 && (
                 <div className="bg-purple-600/20 border border-purple-500/30 rounded-lg p-2 backdrop-blur-sm">
@@ -525,8 +538,10 @@ export default function ChatAgent() {
                 rows={3}
                 disabled={isLoading}
               />
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
+
+              {/* Model Selector and Controls */}
+              <div className="flex justify-between items-center gap-2">
+                <div className="flex items-center gap-2 flex-1">
                   <button
                     onClick={() => setShowPrompts(!showPrompts)}
                     className="text-xs text-purple-300 hover:text-purple-200 transition-colors"
@@ -534,9 +549,13 @@ export default function ChatAgent() {
                     💡 {showPrompts ? 'Hide' : 'Show'} Prompts
                   </button>
                   <span className="text-xs text-purple-300 hidden sm:inline">
-                    • Press Enter to send, Shift+Enter for new line
+                    • Press Enter to send
                   </span>
                 </div>
+
+                {/* Minimalista Model Selector and Thinking Toggle */}
+                <ModelSelector compact={true} />
+
                 <LiquidButton
                   onClick={handleSend}
                   disabled={isLoading || !input.trim()}

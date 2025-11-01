@@ -7,7 +7,6 @@ import { LiquidButton } from '@/components/ui/liquid-glass-button'
 import { Bot, Settings } from 'lucide-react'
 import { SelectedImagesProvider } from '@/shared/contexts/SelectedImagesContext'
 import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
-import ModelSelector from '@/components/ui/ModelSelector'
 import { useImageConfig } from '@/shared/stores/imageConfigStore'
 
 interface AppLayoutProps {
@@ -139,11 +138,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </div>
             </div>
           </header>
-
-          {/* Model Selector - Below Header */}
-          <div className="px-4 py-3 border-b border-white/10 bg-black/20 backdrop-blur-md">
-            <ModelSelector />
-          </div>
 
           {/* Scrollable Main Content */}
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
