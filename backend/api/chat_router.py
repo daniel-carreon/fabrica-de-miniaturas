@@ -74,6 +74,14 @@ class ChatRequest(BaseModel):
         default=None,
         description="User configuration for image generation parameters"
     )
+    selectedModel: Optional[Literal['haiku-4.5', 'sonnet-4.5']] = Field(
+        default='haiku-4.5',
+        description="Claude model version: haiku-4.5 or sonnet-4.5"
+    )
+    enableThinking: Optional[bool] = Field(
+        default=True,
+        description="Enable extended thinking mode for deeper reasoning"
+    )
 
 class PipelineStage(BaseModel):
     id: str
@@ -388,25 +396,29 @@ async def translate_to_english(text: str) -> str:
 
     return text
 
-async def call_openrouter(messages: List[Dict[str, str]]) -> Dict[str, Any]:
-    """Call OpenRouter API with Claude Sonnet 4.5 - optimized for agentic reasoning & multimodal"""
+async def call_openrouter(messages: List[Dict[str, str]], model: str = "anthropic/claude-haiku-4.5", enable_thinking: bool = True) -> Dict[str, Any]:
+    """Call OpenRouter API with Claude model - supports extended thinking"""
     try:
-        logger.info(f"🚀 Calling OpenRouter with Claude Sonnet 4.5 ({len(messages)} messages)")
+        logger.info(f"🚀 Calling OpenRouter with {model} (thinking={enable_thinking}, {len(messages)} messages)")
 
         async with httpx.AsyncClient() as client:
             payload = {
-                # 🎯 UPGRADED: Claude Sonnet 4.5 via OpenRouter
-                # - Frontier intelligence for complex tool calling
-                # - Multimodal (vision) support for image context
-                # - Optimized for real-world agents and coding workflows
-                "model": "anthropic/claude-sonnet-4.5",
+                "model": model,
                 "messages": messages,
                 "tools": TOOLS,
                 "tool_choice": "auto",
                 "max_tokens": 5000,  # Increased for long URL arrays
-                "temperature": 0.7,  # Claude 4.5 optimal: 0.7 for balanced reasoning
+                "temperature": 0.7,
                 "top_p": 0.95
             }
+
+            # Add extended thinking if enabled
+            if enable_thinking:
+                payload["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": 10000  # 10k tokens for thinking
+                }
+                logger.info(f"💭 Extended thinking enabled with 10k token budget")
 
             logger.info(f"📤 OpenRouter payload: model={payload['model']}, messages={len(payload['messages'])}, tools={len(payload['tools'])}")
 
@@ -1054,8 +1066,15 @@ async def chat_endpoint(request: ChatRequest):
         else:
             logger.warning(f"⚠️ NO SELECTED IMAGES CONTEXT IN SYSTEM PROMPT - This is the problem!")
 
-        # Call OpenRouter
-        data = await call_openrouter(messages)
+        # Map selected model to OpenRouter model name
+        model_map = {
+            'haiku-4.5': 'anthropic/claude-haiku-4.5',
+            'sonnet-4.5': 'anthropic/claude-sonnet-4.5'
+        }
+        openrouter_model = model_map.get(request.selectedModel, 'anthropic/claude-haiku-4.5')
+
+        # Call OpenRouter with selected model and thinking setting
+        data = await call_openrouter(messages, openrouter_model, request.enableThinking)
         choice = data.get("choices", [{}])[0]
 
         # Complete Stage 2

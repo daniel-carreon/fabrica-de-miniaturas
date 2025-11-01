@@ -5,6 +5,7 @@ import { useChatStore, ChatMessage } from '../stores/chatStore'
 import { useImageStore } from '@/shared/stores/imageStore'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
 import { useImageConfig } from '@/shared/stores/imageConfigStore'
+import { useModelStore } from '@/shared/stores/modelStore'
 import { useConversationStore } from '@/shared/stores/conversationStore'
 import { backendFetch } from '@/shared/lib/portDetection'
 import GlassCard from '@/components/ui/glass-card'
@@ -48,6 +49,7 @@ export default function ChatAgent() {
   const { setGeneratedImages, loadImagesFromDatabase } = useImageStore()
   const { selectedImages, clearSelection, handleImageSelect } = useSelectedImages()
   const { config, updateConfig, activePreset } = useImageConfig()
+  const { selectedModel, enableThinking } = useModelStore()
 
   // Conversation management
   const {
@@ -199,7 +201,9 @@ export default function ChatAgent() {
           messages: messages, // Context history
           selectedImages: selectedImages, // Include selected images for combination tool
           userConfig: config, // Include user configuration for enhanced prompts
-          pastedImages: pastedImages.map(img => img.base64) // Include pasted images for vision
+          pastedImages: pastedImages.map(img => img.base64), // Include pasted images for vision
+          selectedModel: selectedModel, // Pass selected model (haiku-4.5 or sonnet-4.5)
+          enableThinking: enableThinking // Pass thinking setting
         }),
       })
 
