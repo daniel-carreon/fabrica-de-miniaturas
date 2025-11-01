@@ -6,7 +6,7 @@ import { useImageStore } from '@/shared/stores/imageStore'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
 import { useImageConfig } from '@/shared/stores/imageConfigStore'
 import { useConversationStore } from '@/shared/stores/conversationStore'
-import { useStreamingChat } from '../hooks/useStreamingChat'
+import { useSimpleChat } from '../hooks/useSimpleChat'
 import { backendFetch } from '@/shared/lib/portDetection'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
@@ -63,7 +63,7 @@ export default function ChatAgent() {
   } = useChatStore()
 
   // 🌊 Streaming chat hook (only used if ENABLE_STREAMING = true)
-  const { sendStreamingMessage, stopStreaming, isStreaming, currentStreamId } = useStreamingChat()
+  const { sendMessage, isSending } = useSimpleChat()
 
   const { setGeneratedImages, loadImagesFromDatabase } = useImageStore()
   const { selectedImages, clearSelection, handleImageSelect } = useSelectedImages()
@@ -106,7 +106,7 @@ export default function ChatAgent() {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
     }
-  }, [messages, isStreaming]) // Scroll on messages change or streaming state change
+  }, [messages, isSending]) // Scroll on messages change or sending state change
 
   const handleCopy = async (text: string, messageId: string) => {
     try {
@@ -219,41 +219,12 @@ export default function ChatAgent() {
   })
 
   const handleSend = async () => {
-    if (!input.trim() || (isLoading || isStreaming)) return
+    if (!input.trim() || isLoading || isSending) return
 
     const trimmedInput = input.trim()
     setInput('')
 
-    // 🌊 STREAMING MODE (if enabled via NEXT_PUBLIC_ENABLE_STREAMING=true)
-    if (ENABLE_STREAMING) {
-      try {
-        await sendStreamingMessage(trimmedInput, {
-          selectedImages: selectedImages,
-          pastedImages: pastedImages.map(img => ({
-            base64: img.base64,
-            mimeType: img.mimeType,
-            size: img.size
-          })),
-          userConfig: config,
-          enableThinking: thinkingEnabled
-        })
-
-        // Clear selections after send
-        clearSelection()
-        setPastedImages([])
-
-        // TODO: Implement auto-save for streaming mode
-        // Currently auto-save is handled via 'imagesUpdated' event in useStreamingChat
-        // but full auto-save logic (with routing to correct endpoint) needs to be added
-
-      } catch (error) {
-        console.error('Streaming failed:', error)
-        // TODO: Add toast notification for user
-      }
-      return // Exit early for streaming mode
-    }
-
-    // 📦 NON-STREAMING MODE (legacy, fallback)
+    // ✅ SIMPLE MODE (No SSE, No complexity)
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       role: 'user',
@@ -502,7 +473,7 @@ export default function ChatAgent() {
                 content={message.content}
                 timestamp={message.timestamp}
                 reasoning={message.reasoning}
-                isStreaming={isStreaming && message.id === currentStreamId}
+                isStreaming={false}
                 onCopy={handleCopy}
                 copiedMessageId={copiedMessageId ?? undefined}
               />
@@ -527,14 +498,11 @@ export default function ChatAgent() {
         )}
 
             {/* Minimal Typing Indicator - Shows agent status */}
-            {(isStreaming || agentPhase.type !== 'idle') && (
+            {(isSending || isLoading) && (
               <div className="flex justify-start mb-4">
                 <div className="bg-gray-800/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-gray-700/50">
                   <span className="text-sm text-gray-300 animate-blink">
-                    {agentPhase.type === 'thinking' && 'Pensando...'}
-                    {agentPhase.type === 'executing_tool' && activeToolName && `Ejecutando: ${activeToolName}...`}
-                    {agentPhase.type === 'responding' && 'Generando respuesta...'}
-                    {isStreaming && agentPhase.type === 'idle' && 'Escribiendo...'}
+                    {isSending ? 'Enviando mensaje...' : 'Procesando...'}
                   </span>
                 </div>
               </div>
@@ -613,7 +581,7 @@ export default function ChatAgent() {
                 placeholder="Ask me to generate images, combine them, or paste screenshots (Ctrl+V)..."
                 className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg backdrop-blur-sm text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition-all resize-none"
                 rows={3}
-                disabled={isLoading || isStreaming}
+                disabled={isLoading || isSending}
               />
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -638,12 +606,12 @@ export default function ChatAgent() {
                   )}
                 </div>
                 <LiquidButton
-                  onClick={isStreaming ? stopStreaming : handleSend}
-                  disabled={(isLoading || !input.trim()) && !isStreaming}
-                  variant={isStreaming ? "default" : "space"}
+                  onClick={handleSend}
+                  disabled={isLoading || isSending || !input.trim()}
+                  variant="space"
                   size="sm"
                   className="disabled:opacity-50"
-                  title={isStreaming ? 'Stop' : 'Send'}
+                  title={isSending ? 'Sending...' : 'Send'}
                 >
                   <ArrowUp className="w-4 h-4" />
                 </LiquidButton>
