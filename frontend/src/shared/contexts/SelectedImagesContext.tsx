@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react'
 
-interface SelectedImage {
+export interface SelectedImage {
   id: string
   url: string
   source: string

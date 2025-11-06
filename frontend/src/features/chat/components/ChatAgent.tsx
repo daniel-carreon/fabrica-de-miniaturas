@@ -15,7 +15,7 @@ import ThinkingProcess from '@/components/ui/ThinkingProcess'
 import AgentPipeline, { PipelineStage } from '@/components/ui/AgentPipeline'
 import { MessageRenderer } from '@/components/ui/MessageRenderer'
 import { ModelSelector } from '@/components/ui/ModelSelector'
-import { ChevronDown, ChevronUp, Copy, Check, Paperclip, Star, Trash2, MessageSquare, Folder, Brain, ArrowUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, Check, Paperclip, Star, Trash2, MessageSquare, Folder, Brain, ArrowUp, Settings, X } from 'lucide-react'
 
 interface ReasoningStep {
   type: 'summary' | 'raw_text' | 'encrypted'
@@ -42,6 +42,7 @@ export default function ChatAgent() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [thinkingEnabled, setThinkingEnabled] = useState(true) // 🧠 Extended thinking toggle (DEFAULT ON)
+  const [showConfigPanel, setShowConfigPanel] = useState(false) // 🎨 Image config panel toggle
   const messagesEndRef = useRef<HTMLDivElement>(null) // 📜 Auto-scroll ref
 
   const {
@@ -415,7 +416,36 @@ export default function ChatAgent() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex gap-4">
+      {/* Image Configuration Sidebar - Collapsible */}
+      {showConfigPanel && (
+        <div className="w-72 flex-shrink-0 flex flex-col">
+          <GlassCard variant="dark" className="purple-glow h-full flex flex-col">
+            {/* Header with Close Button */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 flex-shrink-0">
+              <h3 className="text-base font-semibold text-white">🎨 Configuración</h3>
+              <button
+                onClick={() => setShowConfigPanel(false)}
+                className="w-8 h-8 rounded-lg bg-red-600/80 hover:bg-red-600 text-white flex items-center justify-center transition-all hover:scale-110"
+                title="Cerrar panel"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto pt-4">
+              <ImageConfigPanel
+                config={config}
+                onConfigChange={updateConfig}
+              />
+            </div>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0">
       {/* Header - Toggle between Agent and Conversations */}
       <GlassCard variant="dark" className="purple-glow mb-4">
         <div className="flex items-center gap-2">
@@ -585,24 +615,24 @@ export default function ChatAgent() {
               />
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
+                  {/* Image Configuration Button */}
+                  <button
+                    onClick={() => setShowConfigPanel(!showConfigPanel)}
+                    className={`p-2 rounded-lg transition-all ${
+                      showConfigPanel
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-white/10 text-purple-300 hover:bg-white/20'
+                    }`}
+                    title="Image Configuration"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+
                   {ENABLE_STREAMING && (
-                    <>
-                      <button
-                        onClick={() => setThinkingEnabled(!thinkingEnabled)}
-                        className={`p-2 transition-colors rounded-lg ${
-                          thinkingEnabled
-                            ? 'text-purple-200 bg-purple-500/20'
-                            : 'text-purple-400 hover:text-purple-300 hover:bg-purple-500/10'
-                        }`}
-                        title={thinkingEnabled ? 'Extended Thinking ON' : 'Extended Thinking OFF'}
-                      >
-                        <Brain className="w-4 h-4" />
-                      </button>
-                      <ModelSelector
-                        selectedModel={selectedModel}
-                        onModelChange={setSelectedModel}
-                      />
-                    </>
+                    <ModelSelector
+                      selectedModel={selectedModel}
+                      onModelChange={setSelectedModel}
+                    />
                   )}
                 </div>
                 <LiquidButton
@@ -776,6 +806,8 @@ export default function ChatAgent() {
         </>
       )}
 
+      </div>
+      {/* End Main Chat Area */}
     </div>
   )
 }

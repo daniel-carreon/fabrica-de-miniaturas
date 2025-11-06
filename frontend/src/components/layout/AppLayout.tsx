@@ -4,10 +4,8 @@ import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ChatAgent from '@/features/chat/components/ChatAgent'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
-import { Bot, Settings } from 'lucide-react'
+import { Bot } from 'lucide-react'
 import { SelectedImagesProvider } from '@/shared/contexts/SelectedImagesContext'
-import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
-import { useImageConfig } from '@/shared/stores/imageConfigStore'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -16,11 +14,9 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const router = useRouter()
   const [isChatOpen, setIsChatOpen] = useState(false)
-  const [isConfigOpen, setIsConfigOpen] = useState(false)
   const [chatWidth, setChatWidth] = useState(384) // 96 * 4 = 384px (w-96)
   const [isDragging, setIsDragging] = useState(false)
   const dragRef = useRef<number>(0)
-  const { config, updateConfig } = useImageConfig()
 
   // Mobile navigation state
   const [mobileView, setMobileView] = useState<'dashboard' | 'chat'>('dashboard')
@@ -121,19 +117,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   </div>
                 </div>
 
-                {/* RIGHT: Settings */}
+                {/* RIGHT: Empty (Config moved to ChatAgent) */}
                 <div className="flex items-center gap-2 md:gap-3">
-                  <LiquidButton
-                    onClick={() => setIsConfigOpen(!isConfigOpen)}
-                    variant="space"
-                    size="lg"
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center p-0 ${
-                      isConfigOpen ? 'ring-2 ring-purple-400' : ''
-                    }`}
-                    title="Image Configuration"
-                  >
-                    <Settings className="w-5 h-5 md:w-6 md:h-6" />
-                  </LiquidButton>
+                  {/* Settings button removed - now in ChatAgent bottom-left */}
                 </div>
               </div>
             </div>
@@ -149,38 +135,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </main>
         </div>
 
-        {/* Image Configuration Overlay */}
-        {isConfigOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4">
-            <div className="w-full max-w-md bg-black/90 backdrop-blur-md border border-purple-500/30 rounded-xl shadow-2xl max-h-[90vh] flex flex-col">
-              {/* Fixed Header */}
-              <div className="p-4 sm:p-6 border-b border-purple-500/20 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-white purple-glow">
-                    🎨 Image Configuration
-                  </h3>
-                  <LiquidButton
-                    onClick={() => setIsConfigOpen(false)}
-                    variant="space"
-                    size="sm"
-                    className="w-8 h-8 rounded-full flex items-center justify-center p-0"
-                  >
-                    ✕
-                  </LiquidButton>
-                </div>
-              </div>
-
-              {/* Scrollable Content */}
-              <div className="overflow-y-auto flex-1 p-4 sm:p-6 custom-scrollbar">
-                <ImageConfigPanel
-                  config={config}
-                  onConfigChange={updateConfig}
-                  className=""
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Image Configuration moved to ChatAgent sidebar */}
 
         {/* Tablet/Mobile Full Screen View */}
         <div className="lg:hidden">
@@ -193,17 +148,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     🤖 AI Assistant
                   </h1>
                   <div className="flex items-center gap-2">
-                    {/* Configuration Button */}
-                    <LiquidButton
-                      onClick={() => setIsConfigOpen(!isConfigOpen)}
-                      variant="space"
-                      size="sm"
-                      className={`w-10 h-10 rounded-full flex items-center justify-center p-0 ${
-                        isConfigOpen ? 'ring-2 ring-purple-400' : ''
-                      }`}
-                    >
-                      <Settings className="w-5 h-5" />
-                    </LiquidButton>
+                    {/* Configuration moved to ChatAgent bottom-left */}
 
                     {/* Back to Dashboard Button */}
                     <LiquidButton
