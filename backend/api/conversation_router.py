@@ -32,7 +32,17 @@ router = APIRouter(prefix="/conversations", tags=["conversations"])
 # Initialize repository
 supabase_url = os.getenv("SUPABASE_URL")
 supabase_key = os.getenv("SUPABASE_ANON_KEY")
-repo = ConversationRepository(supabase_url, supabase_key)
+
+# Only initialize if both vars are present (allow server to start without Supabase)
+repo = None
+if supabase_url and supabase_key:
+    try:
+        repo = ConversationRepository(supabase_url, supabase_key)
+        logger.info("✅ Supabase repository initialized")
+    except Exception as e:
+        logger.error(f"⚠️ Failed to initialize Supabase repository: {e}")
+else:
+    logger.warning("⚠️ SUPABASE_URL or SUPABASE_ANON_KEY not set - conversation features disabled")
 
 # Default user (single-user setup for now)
 DEFAULT_USER = "daniel"
