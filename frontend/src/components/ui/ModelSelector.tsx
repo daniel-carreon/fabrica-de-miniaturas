@@ -1,61 +1,43 @@
 'use client'
 
-import { Zap, Brain } from 'lucide-react'
+import { useModelStore } from '@/shared/stores/modelStore'
+import { Brain } from 'lucide-react'
 
 interface ModelSelectorProps {
-  selectedModel: 'sonnet' | 'haiku'
-  onModelChange: (model: 'sonnet' | 'haiku') => void
-  className?: string
+  compact?: boolean
 }
 
-/**
- * ModelSelector - Minimal toggle between Sonnet 4.5 and Haiku 4.5
- *
- * Sonnet: Best for complex tasks, coding, agentic reasoning
- * Haiku: 3x cheaper, 2x faster, good for simple tasks
- */
-export function ModelSelector({ selectedModel, onModelChange, className = '' }: ModelSelectorProps) {
-  const models = [
-    {
-      id: 'sonnet' as const,
-      label: 'Sonnet',
-      icon: <Brain className="w-3.5 h-3.5" />,
-      tooltip: 'Sonnet 4.5 - Best for complex tasks',
-      color: 'purple'
-    },
-    {
-      id: 'haiku' as const,
-      label: 'Haiku',
-      icon: <Zap className="w-3.5 h-3.5" />,
-      tooltip: 'Haiku 4.5 - Fast & economical',
-      color: 'cyan'
-    }
-  ]
+export default function ModelSelector({ compact = false }: ModelSelectorProps) {
+  const { selectedModel, setSelectedModel, enableThinking, setEnableThinking } = useModelStore()
 
-  return (
-    <div className={`flex items-center gap-1 ${className}`}>
-      {models.map((model) => {
-        const isSelected = selectedModel === model.id
-        const colorClasses = {
-          purple: isSelected ? 'bg-purple-500/20 text-purple-200' : 'text-purple-400 hover:text-purple-300 hover:bg-purple-500/10',
-          cyan: isSelected ? 'bg-cyan-500/20 text-cyan-200' : 'text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10'
-        }
+  if (compact) {
+    // Minimalista inline version for chat input area
+    return (
+      <div className="flex items-center gap-2 text-xs">
+        <select
+          value={selectedModel}
+          onChange={(e) => setSelectedModel(e.target.value as 'haiku-4.5' | 'sonnet-4.5')}
+          className="bg-purple-900/30 border border-purple-500/30 rounded px-2 py-1 text-purple-200 hover:bg-purple-800/30 focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer"
+        >
+          <option value="haiku-4.5">Haiku 4.5</option>
+          <option value="sonnet-4.5">Sonnet 4.5 ⭐</option>
+        </select>
 
-        return (
-          <button
-            key={model.id}
-            onClick={() => onModelChange(model.id)}
-            className={`p-2 transition-colors rounded-lg ${colorClasses[model.color as keyof typeof colorClasses]}`}
-            title={model.tooltip}
-            aria-label={`Switch to ${model.label}`}
-          >
-            <div className="flex items-center gap-1.5">
-              {model.icon}
-              <span className="text-xs font-medium">{model.label}</span>
-            </div>
-          </button>
-        )
-      })}
-    </div>
-  )
+        <button
+          onClick={() => setEnableThinking(!enableThinking)}
+          className={`px-2 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${
+            enableThinking
+              ? 'bg-purple-600 text-white'
+              : 'bg-purple-900/30 text-purple-300 hover:bg-purple-800/30'
+          }`}
+        >
+          <Brain size={12} />
+          Thinking
+        </button>
+      </div>
+    )
+  }
+
+  // Full version (not used but kept for reference)
+  return null
 }

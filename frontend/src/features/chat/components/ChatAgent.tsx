@@ -1,21 +1,23 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useChatStore, ChatMessage } from '../stores/chatStore'
 import { useImageStore } from '@/shared/stores/imageStore'
 import { useSelectedImages } from '@/shared/contexts/SelectedImagesContext'
 import { useImageConfig } from '@/shared/stores/imageConfigStore'
+import { useModelStore } from '@/shared/stores/modelStore'
 import { useConversationStore } from '@/shared/stores/conversationStore'
-import { useSimpleChat } from '../hooks/useSimpleChat'
 import { backendFetch } from '@/shared/lib/portDetection'
 import GlassCard from '@/components/ui/glass-card'
 import { LiquidButton } from '@/components/ui/liquid-glass-button'
+import PromptsPanel from '@/components/ui/PromptsPanel'
 import ImageConfigPanel from '@/components/ui/ImageConfigPanel'
+import ModelSelector from '@/components/ui/ModelSelector'
+import ThinkingDisplay from '@/components/ui/ThinkingDisplay'
 import ThinkingProcess from '@/components/ui/ThinkingProcess'
 import AgentPipeline, { PipelineStage } from '@/components/ui/AgentPipeline'
 import { MessageRenderer } from '@/components/ui/MessageRenderer'
-import { ModelSelector } from '@/components/ui/ModelSelector'
-import { ChevronDown, ChevronUp, Copy, Check, Paperclip, Star, Trash2, MessageSquare, Folder, Brain, ArrowUp, Settings, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, Check, Paperclip, Star, Trash2 } from 'lucide-react'
 
 interface ReasoningStep {
   type: 'summary' | 'raw_text' | 'encrypted'
@@ -26,49 +28,31 @@ interface PastedImage {
   id: string
   base64: string
   preview: string
-  mimeType: string  // 'image/png', 'image/jpeg', 'image/gif', 'image/webp'
-  size: number      // File size in bytes
 }
-
-// 🎛️ FEATURE FLAG: Toggle streaming on/off
-const ENABLE_STREAMING = process.env.NEXT_PUBLIC_ENABLE_STREAMING === 'true'
 
 export default function ChatAgent() {
   const [input, setInput] = useState('')
+  const [showPrompts, setShowPrompts] = useState(false)
   const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>([])
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [pastedImages, setPastedImages] = useState<PastedImage[]>([])
   const [viewMode, setViewMode] = useState<'agent' | 'conversations'>('agent') // Toggle between agent and conversations
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
-  const [thinkingEnabled, setThinkingEnabled] = useState(true) // 🧠 Extended thinking toggle (DEFAULT ON)
-  const [showConfigPanel, setShowConfigPanel] = useState(false) // 🎨 Image config panel toggle
-  const messagesEndRef = useRef<HTMLDivElement>(null) // 📜 Auto-scroll ref
+  const [lastThinking, setLastThinking] = useState<string | null>(null) // Store latest thinking process
 
   const {
     messages,
     isLoading,
     addMessage,
     setLoading,
-    clearMessages,
-    isThinking,
-    thinkingStep,
-    thinkingMessage,
-    thinkingElapsed,
-    activeToolName,
-    toolProgress,
-    toolStatus,
-    selectedModel,
-    setSelectedModel,
-    agentPhase
+    clearMessages
   } = useChatStore()
-
-  // 🌊 Streaming chat hook (only used if ENABLE_STREAMING = true)
-  const { sendMessage, isSending } = useSimpleChat()
 
   const { setGeneratedImages, loadImagesFromDatabase } = useImageStore()
   const { selectedImages, clearSelection, handleImageSelect } = useSelectedImages()
   const { config, updateConfig, activePreset } = useImageConfig()
+  const { selectedModel, enableThinking } = useModelStore()
 
   // Conversation management
   const {
@@ -102,13 +86,6 @@ export default function ChatAgent() {
     }
   }, [])
 
-  // 📜 Auto-scroll to bottom when new messages arrive or streaming updates
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
-    }
-  }, [messages, isSending]) // Scroll on messages change or sending state change
-
   const handleCopy = async (text: string, messageId: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -137,39 +114,14 @@ export default function ChatAgent() {
         const reader = new FileReader()
         reader.onloadend = () => {
           const base64String = reader.result as string
-
-          // Extract MIME type from data URI (data:image/png;base64,...)
-          const mimeTypeMatch = base64String.match(/^data:(image\/\w+);base64,/)
-          const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/png' // Default to PNG
-
-          // Calculate approximate size in bytes
-          const base64Data = base64String.split(',')[1] || ''
-          const size = Math.round((base64Data.length * 3) / 4)
-
-          // Validate format
-          const supportedFormats = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
-          if (!supportedFormats.includes(mimeType)) {
-            console.warn(`⚠️ Unsupported image format: ${mimeType}`)
-            return
-          }
-
-          // Validate size (max 5MB)
-          const maxSize = 5 * 1024 * 1024
-          if (size > maxSize) {
-            console.error(`❌ Image too large: ${(size / 1024 / 1024).toFixed(2)}MB (max 5MB)`)
-            return
-          }
-
           const pastedImage: PastedImage = {
             id: `pasted_${Date.now()}_${i}`,
             base64: base64String,
-            preview: base64String,
-            mimeType: mimeType,
-            size: size
+            preview: base64String // Use same for preview
           }
 
           setPastedImages(prev => [...prev, pastedImage])
-          console.log(`📸 Image pasted: ${pastedImage.id}, type: ${mimeType}, size: ${(size / 1024).toFixed(1)}KB`)
+          console.log('📸 Image pasted:', pastedImage.id)
         }
         reader.readAsDataURL(blob)
       }
@@ -178,6 +130,14 @@ export default function ChatAgent() {
 
   const removePastedImage = (id: string) => {
     setPastedImages(prev => prev.filter(img => img.id !== id))
+  }
+
+  const handleInjectPrompt = (prompt: string) => {
+    setInput(prev => {
+      const newInput = prev.trim() ? `${prev}\n\n${prompt}` : prompt
+      return newInput
+    })
+    setShowPrompts(false) // Collapse panel after injection
   }
 
   // Conversation panel handlers
@@ -220,20 +180,17 @@ export default function ChatAgent() {
   })
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading || isSending) return
+    if (!input.trim() || isLoading) return
 
-    const trimmedInput = input.trim()
-    setInput('')
-
-    // ✅ SIMPLE MODE (No SSE, No complexity)
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       role: 'user',
-      content: trimmedInput,
+      content: input.trim(),
       timestamp: new Date()
     }
 
     addMessage(userMessage)
+    setInput('')
     setLoading(true)
 
     try {
@@ -247,11 +204,9 @@ export default function ChatAgent() {
           messages: messages, // Context history
           selectedImages: selectedImages, // Include selected images for combination tool
           userConfig: config, // Include user configuration for enhanced prompts
-          pastedImages: pastedImages.map(img => ({
-            base64: img.base64,
-            mimeType: img.mimeType,
-            size: img.size
-          })) // Include pasted images for vision with MIME type
+          pastedImages: pastedImages.map(img => img.base64), // Include pasted images for vision
+          selectedModel: selectedModel, // Pass selected model (haiku-4.5 or sonnet-4.5)
+          enableThinking: enableThinking // Pass thinking setting
         }),
       })
 
@@ -375,6 +330,13 @@ export default function ChatAgent() {
         }
       }
 
+      // Extract thinking content from response for display
+      if (data.reasoning_details && typeof data.reasoning_details === 'string') {
+        setLastThinking(data.reasoning_details)
+      } else if (data.reasoning_details && typeof data.reasoning_details === 'object' && data.reasoning_details.content) {
+        setLastThinking(data.reasoning_details.content)
+      }
+
       const assistantMessage: ChatMessage = {
         id: `msg_${Date.now()}_assistant`,
         role: 'assistant',
@@ -416,63 +378,32 @@ export default function ChatAgent() {
   }
 
   return (
-    <div className="h-full flex gap-4">
-      {/* Image Configuration Sidebar - Collapsible */}
-      {showConfigPanel && (
-        <div className="w-72 flex-shrink-0 flex flex-col">
-          <GlassCard variant="dark" className="purple-glow h-full flex flex-col">
-            {/* Header with Close Button */}
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 flex-shrink-0">
-              <h3 className="text-base font-semibold text-white">🎨 Configuración</h3>
-              <button
-                onClick={() => setShowConfigPanel(false)}
-                className="w-8 h-8 rounded-lg bg-red-600/80 hover:bg-red-600 text-white flex items-center justify-center transition-all hover:scale-110"
-                title="Cerrar panel"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto pt-4">
-              <ImageConfigPanel
-                config={config}
-                onConfigChange={updateConfig}
-              />
-            </div>
-          </GlassCard>
-        </div>
-      )}
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="h-full flex flex-col">
       {/* Header - Toggle between Agent and Conversations */}
       <GlassCard variant="dark" className="purple-glow mb-4">
         <div className="flex items-center gap-2">
-          {/* Agent View Button - Icon Only */}
+          {/* Agent View Button */}
           <LiquidButton
             onClick={() => setViewMode('agent')}
             variant="space"
             size="sm"
-            className={`flex-1 ${
+            className={`flex-1 text-sm font-medium ${
               viewMode === 'agent' ? 'ring-2 ring-purple-400' : ''
             }`}
-            title="Agent Chat"
           >
-            <MessageSquare className="w-4 h-4" />
+            🤖 Agente
           </LiquidButton>
 
-          {/* Conversations View Button - Icon Only */}
+          {/* Conversations View Button */}
           <LiquidButton
             onClick={() => setViewMode('conversations')}
             variant="space"
             size="sm"
-            className={`flex-1 ${
+            className={`flex-1 text-sm font-medium ${
               viewMode === 'conversations' ? 'ring-2 ring-purple-400' : ''
             }`}
-            title="All Conversations"
           >
-            <Folder className="w-4 h-4" />
+            📋 Ver Todas
           </LiquidButton>
         </div>
       </GlassCard>
@@ -485,7 +416,7 @@ export default function ChatAgent() {
             {messages.length === 0 ? (
               <GlassCard variant="purple" className="purple-glow">
                 <div className="text-center py-8">
-                  <MessageSquare className="w-16 h-16 mx-auto mb-3 text-purple-400" />
+                  <div className="text-4xl mb-3">🤖</div>
                   <p className="text-purple-100 font-medium">Hello! I'm your AI assistant</p>
                   <p className="text-purple-200 text-sm mt-2">
                     I can help you generate images, combine them, and manage your files.
@@ -502,8 +433,6 @@ export default function ChatAgent() {
                 role={message.role as 'user' | 'assistant'}
                 content={message.content}
                 timestamp={message.timestamp}
-                reasoning={message.reasoning}
-                isStreaming={false}
                 onCopy={handleCopy}
                 copiedMessageId={copiedMessageId ?? undefined}
               />
@@ -527,20 +456,6 @@ export default function ChatAgent() {
           ))
         )}
 
-            {/* Minimal Typing Indicator - Shows agent status */}
-            {(isSending || isLoading) && (
-              <div className="flex justify-start mb-4">
-                <div className="bg-gray-800/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-gray-700/50">
-                  <span className="text-sm text-gray-300 animate-blink">
-                    {isSending ? 'Enviando mensaje...' : 'Procesando...'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Auto-scroll anchor */}
-            <div ref={messagesEndRef} />
-
             {/* Agent Pipeline - Shows real-time processing stages */}
             <AgentPipeline
               stages={pipelineStages}
@@ -548,9 +463,19 @@ export default function ChatAgent() {
             />
           </div>
 
+          {/* Prompts Panel */}
+          {showPrompts && (
+            <div className="mb-4">
+              <PromptsPanel onInjectPrompt={handleInjectPrompt} />
+            </div>
+          )}
+
           {/* Input */}
           <GlassCard variant="dark" className="purple-glow">
             <div className="space-y-3">
+              {/* Thinking Display - Minimalista Toggle */}
+              <ThinkingDisplay thinking={lastThinking} isLoading={isLoading} />
+
               {/* Selected Images - Minimalist */}
               {selectedImages.length > 0 && (
                 <div className="bg-purple-600/20 border border-purple-500/30 rounded-lg p-2 backdrop-blur-sm">
@@ -611,39 +536,34 @@ export default function ChatAgent() {
                 placeholder="Ask me to generate images, combine them, or paste screenshots (Ctrl+V)..."
                 className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg backdrop-blur-sm text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition-all resize-none"
                 rows={3}
-                disabled={isLoading || isSending}
+                disabled={isLoading}
               />
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  {/* Image Configuration Button */}
-                  <button
-                    onClick={() => setShowConfigPanel(!showConfigPanel)}
-                    className={`p-2 rounded-lg transition-all ${
-                      showConfigPanel
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-white/10 text-purple-300 hover:bg-white/20'
-                    }`}
-                    title="Image Configuration"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </button>
 
-                  {ENABLE_STREAMING && (
-                    <ModelSelector
-                      selectedModel={selectedModel}
-                      onModelChange={setSelectedModel}
-                    />
-                  )}
+              {/* Model Selector and Controls */}
+              <div className="flex justify-between items-center gap-2">
+                <div className="flex items-center gap-2 flex-1">
+                  <button
+                    onClick={() => setShowPrompts(!showPrompts)}
+                    className="text-xs text-purple-300 hover:text-purple-200 transition-colors"
+                  >
+                    💡 {showPrompts ? 'Hide' : 'Show'} Prompts
+                  </button>
+                  <span className="text-xs text-purple-300 hidden sm:inline">
+                    • Press Enter to send
+                  </span>
                 </div>
+
+                {/* Minimalista Model Selector and Thinking Toggle */}
+                <ModelSelector compact={true} />
+
                 <LiquidButton
                   onClick={handleSend}
-                  disabled={isLoading || isSending || !input.trim()}
+                  disabled={isLoading || !input.trim()}
                   variant="space"
                   size="sm"
                   className="disabled:opacity-50"
-                  title={isSending ? 'Sending...' : 'Send'}
                 >
-                  <ArrowUp className="w-4 h-4" />
+                  {isLoading ? '⏳' : '🚀'} <span className="hidden sm:inline">Send</span>
                 </LiquidButton>
               </div>
             </div>
@@ -805,9 +725,6 @@ export default function ChatAgent() {
           </div>
         </>
       )}
-
-      </div>
-      {/* End Main Chat Area */}
     </div>
   )
 }
