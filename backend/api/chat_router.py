@@ -527,12 +527,12 @@ async def call_create_images_api(prompt: str, style: str = "photorealistic", num
         style_instruction = style_instructions.get(style, style_instructions["photorealistic"])
         enhanced_prompt = f"CREATE AND GENERATE: {english_prompt}. Style: {style_instruction}. IMPORTANT: Generate a visual image, not text."
 
-        logger.info(f"🚀 Calling Gemini 2.5 Flash for image creation...")
+        logger.info(f"🚀 Calling Nano Banana Pro (Gemini 3 Pro) for image creation...")
 
-        # Use OpenRouter with Gemini 2.5 Flash for image generation
+        # Use OpenRouter with Nano Banana Pro (Gemini 3 Pro) for image generation
         async with httpx.AsyncClient() as client:
             payload = {
-                "model": "google/gemini-2.5-flash-image-preview",
+                "model": "google/gemini-3-pro-image-preview",  # Nano Banana Pro - mejor razonamiento y calidad
                 "messages": [
                     {
                         "role": "user",
@@ -541,7 +541,7 @@ async def call_create_images_api(prompt: str, style: str = "photorealistic", num
                 ],
                 "modalities": ["image", "text"],
                 "temperature": user_config.temperature if user_config else 0.7,
-                "max_tokens": 1500
+                "max_tokens": 2000  # Aumentado para Nano Banana Pro
             }
 
             response = await client.post(
@@ -793,7 +793,7 @@ async def call_combine_images_api_single(image_urls: List[str], prompt: str, out
             api_params = ImageParameterMapper.build_nano_banana_parameters(user_config) if user_config else {"temperature": 0.3}
 
             combine_payload = {
-                "model": "google/gemini-2.5-flash-image-preview",
+                "model": "google/gemini-3-pro-image-preview",  # Nano Banana Pro - multimodal nativo con razonamiento
                 "messages": [
                     {
                         "role": "user",
@@ -807,7 +807,7 @@ async def call_combine_images_api_single(image_urls: List[str], prompt: str, out
             if user_config:
                 logger.info(f"🔧 Using API params: {api_params}")
 
-            logger.info(f"🚀 Calling Nano Banana for image combination...")
+            logger.info(f"🚀 Calling Nano Banana Pro (Gemini 3 Pro) for image combination...")
 
             nano_response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",

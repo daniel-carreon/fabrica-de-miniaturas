@@ -311,14 +311,15 @@ You are part of "Daniel Flux Context" - a professional image generation system f
             'X-Title': 'Daniel Flux Context - Combine Images'
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash-image-preview',
+            model: 'google/gemini-3-pro-image-preview',  // Nano Banana Pro - multimodal nativo
             messages: [
               {
                 role: 'user',
                 content: `${functionArgs.combination_prompt}\n\nPlease combine these images according to the instructions.`
               }
             ],
-            max_tokens: 1000
+            modalities: ['image', 'text'],  // Habilitar output multimodal
+            max_tokens: 2000
           })
         })
 
