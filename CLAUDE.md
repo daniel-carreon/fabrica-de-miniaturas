@@ -635,7 +635,7 @@ claude-code --debug --mcp-verbose
 #### **2. Sistema de Combinación de Imágenes Conversacional** ✅ **NUEVO!**
    - **UI/UX completamente rediseñado**: Cards minimalistas con selección visual
    - **Workflow funcional**: Usuario selecciona 2 imágenes → Chat detecta → "combina estas dos"
-   - **Backend integrado**: `combine_images` tool con Gemini 2.5 Flash (Nano Banana)
+   - **Backend integrado**: `combine_images` tool con Gemini 3 Pro (Nano Banana Pro)
    - **React Context**: Sistema de selección unificado entre dashboard y chat
    - **Modal expandido**: Metadata completa solo al ampliar imagen
 
@@ -660,7 +660,7 @@ claude-code --debug --mcp-verbose
 - [ ] **Analizar LoRA reentrenamiento** - Evaluar si Context > Dev actual
 
 ### **FASE 2: NANO BANANA INTEGRATION (Segunda herramienta del agente)**
-- [ ] **Investigar Gemini 2.5 Flash Image Preview** via OpenRouter
+- [x] **Gemini 3 Pro Image Preview (Nano Banana Pro) IMPLEMENTADO** via OpenRouter
 - [ ] **Tool calling para "combinar imágenes"** - Segunda función del chat agent
 - [ ] **Sistema de almacenamiento:** ¿Supabase buckets vs URLs temporales Replicate?
 - [ ] **Flujo: Generar → Seleccionar → Combinar → Miniatura final**
@@ -764,7 +764,7 @@ TOOLS = [
 #### **1. Sistema Conversacional Combine Images** ✅ **ÉXITO TOTAL!**
    - ✅ Backend procesa `selectedImages` desde frontend
    - ✅ AI recibe URLs reales en system prompt
-   - ✅ Nano Banana (Gemini 2.5 Flash) combina imágenes perfectamente
+   - ✅ Nano Banana Pro (Gemini 3 Pro) combina imágenes perfectamente
    - ✅ **RESULTADO:** Imagen DANI + Parlamento Budapest generada exitosamente
 
 #### **2. UI/UX Profesional Completado** ✅
