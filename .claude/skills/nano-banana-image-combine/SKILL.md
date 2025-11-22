@@ -1,13 +1,13 @@
 ---
 name: nano-banana-image-combine
-description: Combine multiple images using Gemini 2.5 Flash (Nano Banana) via OpenRouter. Use when merging 2-8 images with AI-guided composition.
+description: Combine multiple images using Gemini 3 Pro (Nano Banana Pro) via OpenRouter. Use when merging 2-8 images with AI-guided composition.
 license: MIT
 ---
 
-# Nano Banana Image Combination
+# Nano Banana Pro Image Combination
 
 ## Purpose
-Combine, merge, and compose multiple images using Google's Gemini 2.5 Flash (codename "Nano Banana") via OpenRouter. Perfect for creating composite images, replacing backgrounds, face swapping, and AI-guided photo manipulation.
+Combine, merge, and compose multiple images using Google's Gemini 3 Pro (codename "Nano Banana Pro") via OpenRouter. Perfect for creating composite images, replacing backgrounds, face swapping, and AI-guided photo manipulation with enhanced reasoning and 2K/4K output.
 
 ## When to Use
 - Combining 2+ images into single composition
@@ -44,7 +44,7 @@ pip install httpx python-dotenv pydantic pillow base64
 # .env
 OPENROUTER_API_KEY=sk-or-v1-...
 FRONTEND_URL=http://localhost:3000
-NANO_BANANA_MODEL=google/gemini-2.5-flash-image-preview
+NANO_BANANA_MODEL=google/gemini-3-pro-image-preview
 ```
 
 ## Quick Start
@@ -82,7 +82,7 @@ async def combine_images(
             "HTTP-Referer": os.getenv('FRONTEND_URL')
         },
         json={
-            "model": "google/gemini-2.5-flash-image-preview",
+            "model": "google/gemini-3-pro-image-preview",
             "messages": [
                 {
                     "role": "user",
@@ -202,7 +202,7 @@ class OpenRouterService:
         self,
         prompt: str,
         images: List[str],  # Base64 encoded
-        model: str = "google/gemini-2.5-flash-image-preview",
+        model: str = "google/gemini-3-pro-image-preview",
         max_tokens: int = 4096
     ) -> Dict[str, Any]:
         """Send chat request with multiple images"""
@@ -781,7 +781,7 @@ async def combine_tool(
 
 ## Resources
 
-- [OpenRouter Gemini Docs](https://openrouter.ai/models/google/gemini-2.5-flash-image-preview)
+- [OpenRouter Nano Banana Pro Docs](https://openrouter.ai/google/gemini-3-pro-image-preview)
 - [Gemini API Guide](https://ai.google.dev/docs)
 - [Image Token Pricing](https://openrouter.ai/docs#pricing)
 - [FastAPI Docs](https://fastapi.tiangolo.com)

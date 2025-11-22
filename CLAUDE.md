@@ -635,7 +635,7 @@ claude-code --debug --mcp-verbose
 #### **2. Sistema de Combinación de Imágenes Conversacional** ✅ **NUEVO!**
    - **UI/UX completamente rediseñado**: Cards minimalistas con selección visual
    - **Workflow funcional**: Usuario selecciona 2 imágenes → Chat detecta → "combina estas dos"
-   - **Backend integrado**: `combine_images` tool con Gemini 2.5 Flash (Nano Banana)
+   - **Backend integrado**: `combine_images` tool con Gemini 3 Pro (Nano Banana Pro)
    - **React Context**: Sistema de selección unificado entre dashboard y chat
    - **Modal expandido**: Metadata completa solo al ampliar imagen
 
@@ -660,7 +660,7 @@ claude-code --debug --mcp-verbose
 - [ ] **Analizar LoRA reentrenamiento** - Evaluar si Context > Dev actual
 
 ### **FASE 2: NANO BANANA INTEGRATION (Segunda herramienta del agente)**
-- [ ] **Investigar Gemini 2.5 Flash Image Preview** via OpenRouter
+- [x] **Gemini 3 Pro Image Preview (Nano Banana Pro) IMPLEMENTADO** via OpenRouter
 - [ ] **Tool calling para "combinar imágenes"** - Segunda función del chat agent
 - [ ] **Sistema de almacenamiento:** ¿Supabase buckets vs URLs temporales Replicate?
 - [ ] **Flujo: Generar → Seleccionar → Combinar → Miniatura final**
@@ -696,13 +696,20 @@ MODELO RECOMENDADO: black-forest-labs/flux-kontext-dev-lora
 - JSON ejemplo: guidance(2-3), num_inference_steps(30-50), lora_strength(0.8-1.2)
 ```
 
-### **OpenRouter Nano Banana Access**
+### **OpenRouter Nano Banana Pro Access** (Actualizado Nov 2025)
 ```
-MODELO: google/gemini-2.5-flash-image-preview
-- Pricing: $0.30/M input + $2.50/M output + $1.238/K images
-- Capabilities: image generation + editing + multi-turn conversations
-- Input: text+image → Output: text+image
-- Context: 32,768 tokens
+MODELO: google/gemini-3-pro-image-preview (Nano Banana Pro)
+- Base: Gemini 3 Pro (más reciente que 2.5 Flash)
+- Pricing: ~$0.15/imagen via fal.ai, pricing OpenRouter similar
+- Capabilities:
+  - image generation + editing + multi-turn conversations
+  - MEJOR texto legible en imágenes
+  - Resolución hasta 2K/4K
+  - Controles avanzados: camera angles, lighting, depth of field, color grading
+  - "Think before generate" - razonamiento visible antes de crear
+- Input: text+image → Output: text+image (multimodal nativo)
+- Context: 1M tokens
+- Arquitectura: Natively multimodal - razona sobre imágenes Y genera en una sola llamada
 ```
 
 ### **Tool Calling Architecture Plan**
@@ -757,7 +764,7 @@ TOOLS = [
 #### **1. Sistema Conversacional Combine Images** ✅ **ÉXITO TOTAL!**
    - ✅ Backend procesa `selectedImages` desde frontend
    - ✅ AI recibe URLs reales en system prompt
-   - ✅ Nano Banana (Gemini 2.5 Flash) combina imágenes perfectamente
+   - ✅ Nano Banana Pro (Gemini 3 Pro) combina imágenes perfectamente
    - ✅ **RESULTADO:** Imagen DANI + Parlamento Budapest generada exitosamente
 
 #### **2. UI/UX Profesional Completado** ✅
@@ -776,9 +783,10 @@ TOOLS = [
 - Frontend: localhost:3006 (funcionando)
 - Backend: localhost:8001 (funcionando)
 - Modelo Flux: daniel-carreon/danielcarrong:56c9356f ✅
-- Modelo Nano Banana: google/gemini-2.5-flash-image-preview ✅
+- Modelo Nano Banana Pro: google/gemini-3-pro-image-preview ✅ (ACTUALIZADO Nov 2025)
+- Multimodalidad: Visión pre-tool + generación nativa ✅
 - Storage: Supabase buckets + Replicate URLs + OpenRouter URLs
-- Tools: generate_images (✅), combine_images (✅)
+- Tools: generate_images (✅), combine_images (✅), create_images (✅)
 
 ## 🚀 **PRÓXIMAS OPORTUNIDADES DE MEJORA (En orden de prioridad)**
 
